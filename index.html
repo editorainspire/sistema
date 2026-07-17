@@ -2980,24 +2980,48 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
     if (diff < 30) return `H\xE1 ${Math.floor(diff / 7)} semanas`;
     return formatDate(date);
   }
+  function parseBirthday(value) {
+    if (value === null || value === void 0 || value === "") return null;
+    if (value instanceof Date && !isNaN(value)) {
+      return { day: value.getDate(), month: value.getMonth() };
+    }
+    const raw = String(value).trim();
+    if (!raw) return null;
+    const br = raw.match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?$/);
+    if (br) {
+      const day = +br[1], month = +br[2] - 1;
+      if (day >= 1 && day <= 31 && month >= 0 && month <= 11) return { day, month };
+    }
+    const iso = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (iso) {
+      const month = +iso[2] - 1, day = +iso[3];
+      if (day >= 1 && day <= 31 && month >= 0 && month <= 11) return { day, month };
+    }
+    const parsed = new Date(raw);
+    if (!isNaN(parsed)) return { day: parsed.getDate(), month: parsed.getMonth() };
+    return null;
+  }
   function formatBirthday(value) {
-    const date = parseDate(value);
-    if (!date) return "\u2014";
-    return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+    const parts = parseBirthday(value);
+    if (!parts) return "\u2014";
+    const d = String(parts.day).padStart(2, "0");
+    const m = String(parts.month + 1).padStart(2, "0");
+    return `${d}/${m}`;
   }
   function birthdayInfo(value) {
-    const date = parseDate(value);
-    if (!date) return null;
+    const parts = parseBirthday(value);
+    if (!parts) return null;
     const today = /* @__PURE__ */ new Date();
     today.setHours(0, 0, 0, 0);
-    const thisYear = new Date(today.getFullYear(), date.getMonth(), date.getDate());
-    const next = thisYear < today ? new Date(today.getFullYear() + 1, date.getMonth(), date.getDate()) : thisYear;
+    const thisYear = new Date(today.getFullYear(), parts.month, parts.day);
+    thisYear.setHours(0, 0, 0, 0);
+    const next = thisYear < today ? new Date(today.getFullYear() + 1, parts.month, parts.day) : thisYear;
     return {
-      day: date.getDate(),
-      month: date.getMonth(),
-      label: formatBirthday(date),
+      day: parts.day,
+      month: parts.month,
+      label: formatBirthday(value),
       isToday: thisYear.getTime() === today.getTime(),
-      isThisMonth: date.getMonth() === today.getMonth(),
+      isThisMonth: parts.month === today.getMonth(),
       daysUntil: Math.round((next - today) / 864e5),
       age: null
       // idade nunca é exposta — só guardamos dia e mês
@@ -3021,8 +3045,9 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
   function birthdaysInWindow(employees, now = /* @__PURE__ */ new Date()) {
     const found = [];
     employees.forEach((employee) => {
-      const birthday = parseDate(employee.aniversario);
-      if (!birthday) return;
+      const parts = parseBirthday(employee.aniversario);
+      if (!parts) return;
+      const birthday = new Date(2e3, parts.month, parts.day);
       for (const year of [now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1]) {
         const window2 = birthdayWindow(birthday, year);
         if (now >= window2.start && now <= window2.end) {
