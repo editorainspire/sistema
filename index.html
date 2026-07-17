@@ -1223,6 +1223,7 @@ tbody tr:hover { background: var(--surface-2); }
 }
 
 .tag-pick {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -1239,7 +1240,7 @@ tbody tr:hover { background: var(--surface-2); }
   user-select: none;
 }
 .tag-pick:hover { border-color: var(--tag-color, var(--text-mute)); transform: translateY(-1px); }
-.tag-pick input { position: absolute; opacity: 0; pointer-events: none; }
+.tag-pick input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
 .tag-pick.is-on {
   background: var(--tag-soft);
   border-color: var(--tag-color);
@@ -1765,16 +1766,21 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
 /* Seletor de participantes (formulário de reunião) */
 .part-picker {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
   gap: 8px;
   max-height: 260px;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: var(--sp-3);
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
+  /* Isola o repaint dentro do container, sem criar contexto que brigue com o scroll do modal */
+  position: relative;
+  contain: layout paint;
 }
 .part-pick {
+  position: relative;
   display: flex;
   flex-direction: column;
   padding: 9px 12px;
@@ -1782,9 +1788,19 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
   border-radius: var(--r-md);
   background: var(--card);
   cursor: pointer;
-  transition: all var(--fast) var(--ease);
+  transition: border-color var(--fast) var(--ease), background var(--fast) var(--ease);
+  overflow: hidden;
 }
-.part-pick input { position: absolute; opacity: 0; pointer-events: none; }
+.part-pick input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.part-pick__name, .part-pick__role { position: relative; pointer-events: none; }
 .part-pick:hover { border-color: var(--text-mute); }
 .part-pick.is-on { border-color: var(--primary); background: var(--primary-soft); }
 .part-pick__name { font-size: 12.5px; font-weight: 500; color: var(--primary); }
@@ -2179,7 +2195,7 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
   transition: transform var(--fast) var(--ease), box-shadow var(--fast) var(--ease);
   box-shadow: 0 0 0 0 var(--sw);
 }
-.swatch input { position: absolute; opacity: 0; pointer-events: none; }
+.swatch input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
 .swatch:hover { transform: scale(1.1); }
 .swatch.is-on {
   box-shadow: 0 0 0 3px var(--card), 0 0 0 5px var(--sw);
@@ -2193,6 +2209,7 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
   gap: 8px;
 }
 .icon-pick {
+  position: relative;
   height: 42px;
   display: grid;
   place-items: center;
@@ -2202,7 +2219,7 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
   cursor: pointer;
   transition: all var(--fast) var(--ease);
 }
-.icon-pick input { position: absolute; opacity: 0; pointer-events: none; }
+.icon-pick input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
 .icon-pick:hover { border-color: var(--text-mute); color: var(--primary); }
 .icon-pick.is-on {
   border-color: var(--primary);
@@ -4429,6 +4446,7 @@ tbody tr:hover { background: var(--surface-2); }
 }
 
 .tag-pick {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -4445,7 +4463,7 @@ tbody tr:hover { background: var(--surface-2); }
   user-select: none;
 }
 .tag-pick:hover { border-color: var(--tag-color, var(--text-mute)); transform: translateY(-1px); }
-.tag-pick input { position: absolute; opacity: 0; pointer-events: none; }
+.tag-pick input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
 .tag-pick.is-on {
   background: var(--tag-soft);
   border-color: var(--tag-color);
@@ -4971,16 +4989,21 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
 /* Seletor de participantes (formulário de reunião) */
 .part-picker {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
   gap: 8px;
   max-height: 260px;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: var(--sp-3);
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
+  /* Isola o repaint dentro do container, sem criar contexto que brigue com o scroll do modal */
+  position: relative;
+  contain: layout paint;
 }
 .part-pick {
+  position: relative;
   display: flex;
   flex-direction: column;
   padding: 9px 12px;
@@ -4988,9 +5011,19 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
   border-radius: var(--r-md);
   background: var(--card);
   cursor: pointer;
-  transition: all var(--fast) var(--ease);
+  transition: border-color var(--fast) var(--ease), background var(--fast) var(--ease);
+  overflow: hidden;
 }
-.part-pick input { position: absolute; opacity: 0; pointer-events: none; }
+.part-pick input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.part-pick__name, .part-pick__role { position: relative; pointer-events: none; }
 .part-pick:hover { border-color: var(--text-mute); }
 .part-pick.is-on { border-color: var(--primary); background: var(--primary-soft); }
 .part-pick__name { font-size: 12.5px; font-weight: 500; color: var(--primary); }
@@ -5385,7 +5418,7 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
   transition: transform var(--fast) var(--ease), box-shadow var(--fast) var(--ease);
   box-shadow: 0 0 0 0 var(--sw);
 }
-.swatch input { position: absolute; opacity: 0; pointer-events: none; }
+.swatch input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
 .swatch:hover { transform: scale(1.1); }
 .swatch.is-on {
   box-shadow: 0 0 0 3px var(--card), 0 0 0 5px var(--sw);
@@ -5399,6 +5432,7 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
   gap: 8px;
 }
 .icon-pick {
+  position: relative;
   height: 42px;
   display: grid;
   place-items: center;
@@ -5408,7 +5442,7 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
   cursor: pointer;
   transition: all var(--fast) var(--ease);
 }
-.icon-pick input { position: absolute; opacity: 0; pointer-events: none; }
+.icon-pick input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
 .icon-pick:hover { border-color: var(--text-mute); color: var(--primary); }
 .icon-pick.is-on {
   border-color: var(--primary);
@@ -5554,18 +5588,25 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
   }
   var MEETING_MODES = ["Presencial", "Online", "H\xEDbrida"];
   function cleanTime(value) {
-    if (!value) return "";
+    if (value === null || value === void 0 || value === "") return "";
+    if (value instanceof Date && !isNaN(value)) {
+      return `${String(value.getHours()).padStart(2, "0")}:${String(value.getMinutes()).padStart(2, "0")}`;
+    }
     const raw = String(value).trim();
+    if (!raw) return "";
     const direct = raw.match(/^(\d{1,2}):(\d{2})/);
     if (direct) return `${direct[1].padStart(2, "0")}:${direct[2]}`;
-    const iso = raw.match(/T(\d{2}):(\d{2})/);
-    if (iso) return `${iso[1]}:${iso[2]}`;
+    const embedded = raw.match(/[T\s](\d{1,2}):(\d{2})(?::\d{2})?/);
+    if (embedded) return `${embedded[1].padStart(2, "0")}:${embedded[2]}`;
+    const parsed = new Date(raw);
+    if (!isNaN(parsed)) {
+      const h = parsed.getHours(), m = parsed.getMinutes();
+      if (h !== 0 || m !== 0) return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+    }
     const num = Number(raw);
     if (!isNaN(num) && num > 0 && num < 1) {
       const totalMin = Math.round(num * 24 * 60);
-      const h = String(Math.floor(totalMin / 60)).padStart(2, "0");
-      const m = String(totalMin % 60).padStart(2, "0");
-      return `${h}:${m}`;
+      return `${String(Math.floor(totalMin / 60)).padStart(2, "0")}:${String(totalMin % 60).padStart(2, "0")}`;
     }
     return "";
   }
