@@ -5593,19 +5593,24 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
   function meetingConflicts(candidate, allMeetings, employees) {
     const range = meetingRange(candidate);
     if (!range) return [];
-    const participants = meetingParticipants(candidate);
+    const participants = meetingParticipants(candidate).map(String);
+    if (!participants.length) return [];
+    const candidateId = candidate.id ? String(candidate.id) : null;
     const nameOf = (id) => {
       const person = employees.find((e) => String(e.id) === String(id));
       return person ? person.nome : id;
     };
     const conflicts = [];
+    const seen = /* @__PURE__ */ new Set();
     allMeetings.forEach((meeting) => {
-      if (String(meeting.id) === String(candidate.id)) return;
+      if (candidateId && String(meeting.id) === candidateId) return;
+      if (meeting.status === "Cancelada") return;
       const otherRange = meetingRange(meeting);
       if (!otherRange || !overlaps(range, otherRange)) return;
-      const others = meetingParticipants(meeting);
+      const others = meetingParticipants(meeting).map(String);
       participants.forEach((id) => {
-        if (others.includes(id)) {
+        if (others.includes(id) && !seen.has(id)) {
+          seen.add(id);
           conflicts.push({ pessoa: nameOf(id), reuniao: meeting });
         }
       });
@@ -8216,8 +8221,16 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
         const checkConflicts = bindMeetingForm(container, state.meetings, state.employees, meeting.id || null);
         container.querySelector("#saveMeeting").addEventListener("click", async () => {
           const data = meetingFormData(container);
-          if (!data.titulo || !data.data || !data.inicio || !data.fim) {
-            Toast.error("T\xEDtulo, data e hor\xE1rios s\xE3o obrigat\xF3rios.");
+          if (!data.titulo) {
+            Toast.error("Informe o t\xEDtulo da reuni\xE3o.");
+            return;
+          }
+          if (!data.data) {
+            Toast.error("Escolha a data.");
+            return;
+          }
+          if (!data.inicio || !data.fim) {
+            Toast.error("Preencha os hor\xE1rios de in\xEDcio e t\xE9rmino.");
             return;
           }
           if (data.fim <= data.inicio) {
@@ -8228,15 +8241,25 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
             Toast.error("Selecione ao menos um participante da equipe.");
             return;
           }
-          const conflicts = meetingConflicts({ ...data, id: meeting.id || null }, state.meetings, state.employees);
+          const candidato = {
+            id: editing ? meeting.id : null,
+            data: data.data,
+            inicio: data.inicio,
+            fim: data.fim,
+            status: data.status,
+            participantes: data.participantes
+          };
+          const conflicts = meetingConflicts(candidato, state.meetings, state.employees);
           if (conflicts.length) {
             checkConflicts();
-            Toast.error(`Conflito de agenda: ${conflicts[0].pessoa} j\xE1 tem reuni\xE3o nesse hor\xE1rio.`);
+            const nomes = conflicts.map((c) => c.pessoa.split(" ")[0]).join(", ");
+            Toast.error(`Conflito de agenda: ${nomes} j\xE1 tem reuni\xE3o nesse hor\xE1rio. Remova a pessoa ou mude o hor\xE1rio.`);
             return;
           }
           if (data.link) data.link = normalizeUrl(data.link);
           await runWithButton(container.querySelector("#saveMeeting"), async () => {
-            const result = editing ? await updateMeeting({ ...meeting, ...data }) : await createMeeting(data);
+            const payload = editing ? { ...meeting, ...data, id: meeting.id } : data;
+            const result = editing ? await updateMeeting(payload) : await createMeeting(payload);
             notifySaved(result, editing ? "Reuni\xE3o atualizada." : "Reuni\xE3o agendada.");
             Modal.close();
             await sync({ silent: true });
