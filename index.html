@@ -1802,6 +1802,36 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
 .conflict__list { display: flex; flex-direction: column; gap: 3px; padding-left: 21px; }
 .conflict__list li { font-size: 12px; color: var(--text); list-style: disc; }
 
+/* Ajustes do card de reunião: data legível, pauta, ata, status */
+.meet__time { display: flex; flex-direction: column; align-items: flex-end; }
+.meet__dash { font-size: 10px; color: var(--text-mute); line-height: 1; margin: 1px 0; }
+.meet__tags { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+
+.meet__pauta {
+  font-size: 12.5px;
+  color: var(--text-soft);
+  line-height: 1.5;
+  margin-bottom: 10px;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+
+.meet__ata {
+  background: var(--surface-2);
+  border-radius: var(--r-md);
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+.meet__ata-label {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--text-mute); margin-bottom: 4px;
+}
+.meet__ata-label svg { width: 12px; height: 12px; }
+.meet__ata p { font-size: 12.5px; color: var(--text-soft); line-height: 1.55; white-space: pre-wrap; }
+
+.meet.is-cancelled { opacity: .68; }
+.meet.is-cancelled .meet__title { text-decoration: line-through; text-decoration-color: var(--text-mute); }
+
 /* ==========================================================================
    Inspire Presence — modal.css
    Overlay, painel, detalhes do colaborador, formulários, confirmação
@@ -2877,7 +2907,11 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
   }
   function parseDate(value) {
     if (!value) return null;
-    if (value instanceof Date) return isNaN(value) ? null : value;
+    if (value instanceof Date) {
+      if (isNaN(value)) return null;
+      if (value.getFullYear() <= 1900) return null;
+      return value;
+    }
     const raw = String(value).trim();
     if (!raw) return null;
     const br = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
@@ -2886,8 +2920,12 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
     if (iso) return new Date(+iso[1], +iso[2] - 1, +iso[3]);
     const dayMonth = raw.match(/^(\d{2})\/(\d{2})$/);
     if (dayMonth) return new Date((/* @__PURE__ */ new Date()).getFullYear(), +dayMonth[2] - 1, +dayMonth[1]);
+    const isoFull = raw.match(/^(\d{4})-(\d{2})-(\d{2})T/);
+    if (isoFull) return new Date(+isoFull[1], +isoFull[2] - 1, +isoFull[3]);
     const parsed = new Date(raw);
-    return isNaN(parsed) ? null : parsed;
+    if (isNaN(parsed)) return null;
+    if (parsed.getFullYear() <= 1900) return null;
+    return parsed;
   }
   function formatDate(value) {
     const date = parseDate(value);
@@ -4945,6 +4983,36 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
 .conflict__list { display: flex; flex-direction: column; gap: 3px; padding-left: 21px; }
 .conflict__list li { font-size: 12px; color: var(--text); list-style: disc; }
 
+/* Ajustes do card de reunião: data legível, pauta, ata, status */
+.meet__time { display: flex; flex-direction: column; align-items: flex-end; }
+.meet__dash { font-size: 10px; color: var(--text-mute); line-height: 1; margin: 1px 0; }
+.meet__tags { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+
+.meet__pauta {
+  font-size: 12.5px;
+  color: var(--text-soft);
+  line-height: 1.5;
+  margin-bottom: 10px;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+
+.meet__ata {
+  background: var(--surface-2);
+  border-radius: var(--r-md);
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+.meet__ata-label {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--text-mute); margin-bottom: 4px;
+}
+.meet__ata-label svg { width: 12px; height: 12px; }
+.meet__ata p { font-size: 12.5px; color: var(--text-soft); line-height: 1.55; white-space: pre-wrap; }
+
+.meet.is-cancelled { opacity: .68; }
+.meet.is-cancelled .meet__title { text-decoration: line-through; text-decoration-color: var(--text-mute); }
+
 /* ==========================================================================
    Inspire Presence — modal.css
    Overlay, painel, detalhes do colaborador, formulários, confirmação
@@ -5463,6 +5531,7 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
   function meetingRange(meeting) {
     const day = parseDate(meeting.data);
     if (!day) return null;
+    day.setHours(0, 0, 0, 0);
     const [h1, m1] = String(meeting.inicio || "00:00").split(":").map(Number);
     const [h2, m2] = String(meeting.fim || meeting.inicio || "00:00").split(":").map(Number);
     const start = new Date(day);
@@ -5503,8 +5572,22 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
     return conflicts;
   }
   function upcomingMeetings(meetings, now = /* @__PURE__ */ new Date(), limit = null) {
-    const list = meetings.map((meeting) => ({ meeting, range: meetingRange(meeting) })).filter((item) => item.range && item.range.end >= now).sort((a, b) => a.range.start - b.range.start).map((item) => item.meeting);
+    const today = new Date(now);
+    today.setHours(0, 0, 0, 0);
+    const list = meetings.map((meeting) => ({ meeting, day: parseDate(meeting.data) })).filter((item) => {
+      if (!item.day) return false;
+      item.day.setHours(0, 0, 0, 0);
+      return item.day >= today && isOpenStatus(item.meeting.status);
+    }).sort((a, b) => {
+      const byDay = a.day - b.day;
+      if (byDay !== 0) return byDay;
+      return String(a.meeting.inicio).localeCompare(String(b.meeting.inicio));
+    }).map((item) => item.meeting);
     return limit ? list.slice(0, limit) : list;
+  }
+  var MEETING_STATUSES = ["Agendada", "Realizada", "Cancelada", "Reagendada"];
+  function isOpenStatus(status) {
+    return !status || status === "Agendada" || status === "Reagendada";
   }
   function groupMeetingsByDay(meetings) {
     const groups = /* @__PURE__ */ new Map();
@@ -5716,7 +5799,9 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
         participantes: normalizeAreas(participantes),
         // reaproveita o parser de lista
         externos: String(pick(row, "externos", "convidados", "externals", "participantes externos")),
-        observacoes: String(pick(row, "observacoes", "observa\xE7\xF5es", "obs", "pauta"))
+        pauta: String(pick(row, "pauta", "agenda", "observacoes", "observa\xE7\xF5es", "obs")),
+        status: String(pick(row, "status", "situacao", "situa\xE7\xE3o") || "Agendada"),
+        ata: String(pick(row, "ata", "notas", "registro", "pontos", "minutes"))
       };
     },
     toPayload(meeting) {
@@ -5731,7 +5816,9 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
         "link",
         "criadoPor",
         "externos",
-        "observacoes"
+        "pauta",
+        "status",
+        "ata"
       ];
       const payload = {};
       fields.forEach((field) => {
@@ -5881,9 +5968,9 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
         return d.toISOString().slice(0, 10);
       };
       this.meetings = [
-        { id: "r1", titulo: "Reuni\xE3o de pauta editorial", data: isoDay(0), inicio: "10:00", fim: "11:00", modo: "Presencial", local: "Sala 2", link: "", criadoPor: "Ana Beatriz Moraes", participantes: "2, 3, 11", externos: "", observacoes: "Definir capa do pr\xF3ximo lan\xE7amento." },
-        { id: "r2", titulo: "Alinhamento de marketing", data: isoDay(1), inicio: "14:00", fim: "15:00", modo: "Online", local: "", link: "https://meet.google.com/abc-defg-hij", criadoPor: "Camila Ferraz", participantes: "6, 7", externos: "Ag\xEAncia Norte", observacoes: "" },
-        { id: "r3", titulo: "Kickoff Bienal", data: isoDay(3), inicio: "09:30", fim: "10:30", modo: "H\xEDbrida", local: "Audit\xF3rio", link: "https://meet.google.com/xyz-1234-abc", criadoPor: "Juliana Prado", participantes: "4, 5, 1", externos: "Organiza\xE7\xE3o da Bienal", observacoes: "Levar amostras do estande." }
+        { id: "r1", titulo: "Reuni\xE3o de pauta editorial", data: isoDay(0), inicio: "10:00", fim: "11:00", modo: "Presencial", local: "Sala 2", link: "", criadoPor: "Ana Beatriz Moraes", participantes: "2, 3, 11", externos: "", pauta: "Definir capa do pr\xF3ximo lan\xE7amento.", status: "Agendada", ata: "" },
+        { id: "r2", titulo: "Alinhamento de marketing", data: isoDay(1), inicio: "14:00", fim: "15:00", modo: "Online", local: "", link: "https://meet.google.com/abc-defg-hij", criadoPor: "Camila Ferraz", participantes: "6, 7", externos: "Ag\xEAncia Norte", pauta: "Campanhas do trimestre.", status: "Agendada", ata: "" },
+        { id: "r3", titulo: "Retrospectiva do m\xEAs", data: isoDay(-4), inicio: "09:30", fim: "10:30", modo: "H\xEDbrida", local: "Audit\xF3rio", link: "https://meet.google.com/xyz-1234-abc", criadoPor: "Juliana Prado", participantes: "4, 5, 1", externos: "", pauta: "O que funcionou e o que ajustar.", status: "Realizada", ata: "Aprovado o novo fluxo de capas. Rafael assume a revis\xE3o dos gabaritos." }
       ];
       this.announcements = [
         { id: "a1", titulo: "Bienal do Livro \u2014 escala da equipe", mensagem: "A escala do estande j\xE1 est\xE1 fechada. Quem for para S\xE3o Paulo, retire o crach\xE1 com a Juliana at\xE9 quinta-feira.", autor: "Juliana Prado", data: iso(-1), prioridade: "Alta" },
@@ -6574,18 +6661,32 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
   function meetingModeMeta(mode) {
     return MODE_META[mode] || MODE_META["Presencial"];
   }
+  var MEETING_STATUS_META = {
+    "Agendada": { color: "var(--info)", soft: "var(--info-soft)" },
+    "Realizada": { color: "var(--success)", soft: "var(--success-soft)" },
+    "Cancelada": { color: "var(--danger)", soft: "var(--danger-soft)" },
+    "Reagendada": { color: "var(--warning)", soft: "var(--warning-soft)" }
+  };
+  function meetingStatusMeta(status) {
+    return MEETING_STATUS_META[status] || MEETING_STATUS_META["Agendada"];
+  }
   function meetingRow(meeting, employees, admin = true) {
     const meta = meetingModeMeta(meeting.modo);
+    const statusMeta2 = meetingStatusMeta(meeting.status);
     const ids = meetingParticipants(meeting);
     const people = ids.map((id) => employees.find((e) => String(e.id) === String(id))).filter(Boolean);
     const stack = people.slice(0, 5).map((person) => avatar(person, "avatar--xs")).join("");
     const extra = people.length > 5 ? `<span class="meet__more">+${people.length - 5}</span>` : "";
     const externos = (meeting.externos || "").trim();
     const link = (meeting.link || "").trim();
+    const pauta = (meeting.pauta || "").trim();
+    const ata = (meeting.ata || "").trim();
+    const cancelada = meeting.status === "Cancelada";
     return `
-    <article class="meet" style="--status-color:${meta.color};--status-soft:${meta.soft}" data-id="${escapeHtml(meeting.id)}">
+    <article class="meet ${cancelada ? "is-cancelled" : ""}" style="--status-color:${meta.color};--status-soft:${meta.soft}" data-id="${escapeHtml(meeting.id)}">
       <div class="meet__time">
         <span class="meet__start">${escapeHtml(meeting.inicio || "--:--")}</span>
+        <span class="meet__dash">\u2014</span>
         <span class="meet__end">${escapeHtml(meeting.fim || "")}</span>
       </div>
 
@@ -6594,23 +6695,33 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
       <div class="meet__body">
         <div class="meet__head">
           <h3 class="meet__title">${escapeHtml(meeting.titulo)}</h3>
-          <span class="badge" style="--status-color:${meta.color};--status-soft:${meta.soft}">
-            ${icon(meta.icon, 12)} ${escapeHtml(meeting.modo)}
-          </span>
+          <div class="meet__tags">
+            ${meeting.status && meeting.status !== "Agendada" ? `<span class="badge" style="--status-color:${statusMeta2.color};--status-soft:${statusMeta2.soft}"><span class="badge__dot"></span>${escapeHtml(meeting.status)}</span>` : ""}
+            <span class="badge" style="--status-color:${meta.color};--status-soft:${meta.soft}">
+              ${icon(meta.icon, 12)} ${escapeHtml(meeting.modo)}
+            </span>
+          </div>
         </div>
+
+        ${pauta ? `<p class="meet__pauta">${escapeHtml(pauta)}</p>` : ""}
 
         <div class="meet__meta">
           ${meeting.local ? `<span>${icon("mapPin", 13)} ${escapeHtml(meeting.local)}</span>` : ""}
           ${link ? `<a href="${escapeHtml(normalizeUrl(link))}" target="_blank" rel="noopener">${icon("video", 13)} Entrar na chamada</a>` : ""}
-          ${meeting.criadoPor ? `<span>${icon("user", 13)} ${escapeHtml(meeting.criadoPor)}</span>` : ""}
         </div>
 
+        ${ata ? `
+          <div class="meet__ata">
+            <span class="meet__ata-label">${icon("book", 12)} Ata</span>
+            <p>${escapeHtml(ata)}</p>
+          </div>` : ""}
+
         <div class="meet__foot">
-          <div class="meet__people">${stack}${extra}</div>
+          <div class="meet__people">${stack || '<span class="muted" style="font-size:11.5px">Sem participantes internos</span>'}${extra}</div>
           ${externos ? `<span class="meet__ext">${icon("userPlus", 13)} ${escapeHtml(externos)}</span>` : ""}
           ${admin ? `
             <div class="meet__actions">
-              <button data-action="edit-meeting" data-id="${escapeHtml(meeting.id)}" title="Editar">${icon("edit", 14)}</button>
+              <button data-action="edit-meeting" data-id="${escapeHtml(meeting.id)}" title="Editar / registrar ata">${icon("edit", 14)}</button>
               <button data-action="delete-meeting" data-id="${escapeHtml(meeting.id)}" title="Excluir">${icon("trash", 14)}</button>
             </div>` : ""}
         </div>
@@ -7230,7 +7341,23 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
       <div class="field span-2" id="linkField">
         <label class="field__label" for="m-link">Link da chamada</label>
         <input id="m-link" name="link" value="${value("link")}" placeholder="https://meet.google.com/\u2026">
-        <span class="field__hint" id="linkHint">Obrigat\xF3rio para reuni\xF5es online ou h\xEDbridas.</span>
+        <span class="field__hint" id="linkHint">Cole o link do Meet, Zoom ou Teams.</span>
+      </div>
+
+      <div class="form-section"><span class="eyebrow">Situa\xE7\xE3o</span></div>
+
+      <div class="field">
+        <label class="field__label" for="m-status">Status</label>
+        <select id="m-status" name="status">${MEETING_STATUSES.map((st) => `<option value="${st}" ${(meeting.status || "Agendada") === st ? "selected" : ""}>${st}</option>`).join("")}</select>
+      </div>
+      <div class="field">
+        <label class="field__label">&nbsp;</label>
+        <span class="field__hint" style="padding-top:11px">Reuni\xF5es passadas ficam no arquivo, separadas por status.</span>
+      </div>
+
+      <div class="field span-2">
+        <label class="field__label" for="m-ata">Ata / pontos importantes</label>
+        <textarea id="m-ata" name="ata" placeholder="Decis\xF5es, encaminhamentos, respons\xE1veis\u2026">${value("ata")}</textarea>
       </div>
 
       <div class="form-section"><span class="eyebrow">Participantes da equipe</span></div>
@@ -7247,8 +7374,8 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
       </div>
 
       <div class="field span-2">
-        <label class="field__label" for="m-obs">Pauta / observa\xE7\xF5es</label>
-        <textarea id="m-obs" name="observacoes" placeholder="O que ser\xE1 tratado?">${value("observacoes")}</textarea>
+        <label class="field__label" for="m-pauta">Tema / pauta</label>
+        <textarea id="m-pauta" name="pauta" placeholder="O que ser\xE1 tratado?">${escapeHtml(meeting.pauta || "")}</textarea>
       </div>
 
       <div class="span-2" id="conflictBox"></div>
@@ -7267,8 +7394,7 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
       const hibrida = modo.value === "H\xEDbrida";
       linkField.style.display = online || hibrida ? "" : "none";
       localField.style.display = online ? "none" : "";
-      link.required = online || hibrida;
-      linkHint.textContent = hibrida ? "Obrigat\xF3rio: parte da equipe participa remotamente." : "Obrigat\xF3rio para reuni\xF5es online.";
+      link.required = false;
     };
     modo.addEventListener("change", toggleMode);
     toggleMode();
@@ -7571,9 +7697,7 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
     });
     container.innerHTML = ordered.map((link, index) => linkCard(link, index)).join("");
   }
-  function renderAgenda(container, meetings, employees) {
-    const upcoming = upcomingMeetings(meetings);
-    const past = meetings.filter((meeting) => !upcoming.includes(meeting)).sort((a, b) => String(b.data + b.inicio).localeCompare(String(a.data + a.inicio)));
+  function renderAgenda(container, meetings, employees, activeTab = "proximas") {
     if (!meetings.length) {
       container.innerHTML = `
       <div class="empty">
@@ -7584,22 +7708,65 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
       </div>`;
       return;
     }
-    const section = (title, list, muted = false) => {
-      if (!list.length) return "";
-      const days = groupMeetingsByDay(list);
-      const blocks = days.map(([day, dayMeetings]) => `
-      <div class="agenda__day ${muted ? "is-past" : ""}">
+    const today = /* @__PURE__ */ new Date();
+    today.setHours(0, 0, 0, 0);
+    const isFuture = (m) => {
+      const d = parseDate(m.data);
+      if (!d) return false;
+      d.setHours(0, 0, 0, 0);
+      return d >= today;
+    };
+    const buckets = {
+      proximas: meetings.filter((m) => isFuture(m) && isOpenStatus(m.status)),
+      realizadas: meetings.filter((m) => m.status === "Realizada"),
+      canceladas: meetings.filter((m) => m.status === "Cancelada"),
+      reagendadas: meetings.filter((m) => m.status === "Reagendada" && !isFuture(m))
+    };
+    const tabs = [
+      { key: "proximas", label: "Pr\xF3ximas", count: buckets.proximas.length },
+      { key: "realizadas", label: "Realizadas", count: buckets.realizadas.length },
+      { key: "reagendadas", label: "Reagendadas", count: buckets.reagendadas.length },
+      { key: "canceladas", label: "Canceladas", count: buckets.canceladas.length }
+    ];
+    const tabBar = `
+    <div class="chips" style="margin-bottom:20px">
+      ${tabs.map((tab) => `
+        <button class="chip ${activeTab === tab.key ? "is-active" : ""}" data-meeting-tab="${tab.key}"
+                style="--status-color:var(--primary);--status-soft:var(--primary-soft)">
+          ${escapeHtml(tab.label)} <span class="chip__count">${tab.count}</span>
+        </button>`).join("")}
+    </div>`;
+    let list = buckets[activeTab] || [];
+    if (activeTab === "proximas") {
+      list = [...list].sort((a, b) => String(a.data + a.inicio).localeCompare(String(b.data + b.inicio)));
+    } else {
+      list = [...list].sort((a, b) => String(b.data + b.inicio).localeCompare(String(a.data + a.inicio)));
+    }
+    if (!list.length) {
+      container.innerHTML = tabBar + `
+      <div class="empty">
+        <div class="empty__icon">${icon("calendar", 24)}</div>
+        <h3>Nada aqui</h3>
+        <p>Nenhuma reuni\xE3o com esse status no momento.</p>
+      </div>`;
+      return;
+    }
+    const days = groupMeetingsByDay(list);
+    const orderedDays = activeTab === "proximas" ? days : [...days].reverse();
+    const blocks = orderedDays.map(([day, dayMeetings]) => {
+      const sorted = activeTab === "proximas" ? dayMeetings : [...dayMeetings].reverse();
+      return `
+      <div class="agenda__day">
         <div class="agenda__date">
           <span class="agenda__label">${escapeHtml(agendaDayLabel(day))}</span>
           <span class="agenda__count">${dayMeetings.length} reuni\xE3o${dayMeetings.length === 1 ? "" : "es"}</span>
         </div>
         <div class="agenda__items">
-          ${dayMeetings.map((meeting) => meetingRow(meeting, employees)).join("")}
+          ${sorted.map((meeting) => meetingRow(meeting, employees)).join("")}
         </div>
-      </div>`).join("");
-      return `<div class="agenda__section"><span class="eyebrow" style="display:block;margin-bottom:12px">${title}</span>${blocks}</div>`;
-    };
-    container.innerHTML = section("Pr\xF3ximas", upcoming) + section("Anteriores", past, true);
+      </div>`;
+    }).join("");
+    container.innerHTML = tabBar + blocks;
   }
   function renderMeetingStrip(container, meetings, employees) {
     const next = upcomingMeetings(meetings, /* @__PURE__ */ new Date(), 3);
@@ -7639,6 +7806,7 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
     links: [],
     categories: [],
     meetings: [],
+    meetingTab: "proximas",
     filters: { search: "", status: "Todos", departamento: "", equipe: "", cargo: "", responsavel: "" },
     noticeArea: "",
     linkCategory: "",
@@ -7761,7 +7929,7 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
     renderLinkChips($("#linkChips"), state.links, state.linkCategory);
     renderLinks($("#linkGrid"), state.links, state.linkCategory);
     renderMeetingStrip($("#meetingStrip"), state.meetings, state.employees);
-    renderAgenda($("#agenda"), state.meetings, state.employees);
+    renderAgenda($("#agenda"), state.meetings, state.employees, state.meetingTab);
     renderAdminTable();
     $("#navCountLinks").textContent = state.links.length;
     $("#navCountMeetings").textContent = state.meetings.length;
@@ -8014,11 +8182,6 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
           }
           if (data.fim <= data.inicio) {
             Toast.error("O t\xE9rmino deve ser depois do in\xEDcio.");
-            return;
-          }
-          if ((data.modo === "Online" || data.modo === "H\xEDbrida") && !data.link.trim()) {
-            Toast.error("Reuni\xE3o online ou h\xEDbrida exige o link da chamada.");
-            container.querySelector("#m-link").focus();
             return;
           }
           if (!data.participantes.length) {
@@ -8447,6 +8610,12 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
       const chip = event.target.closest(".chip");
       if (!chip) return;
       state.noticeArea = chip.dataset.area;
+      render();
+    });
+    $("#agenda").addEventListener("click", (event) => {
+      const tab = event.target.closest("[data-meeting-tab]");
+      if (!tab) return;
+      state.meetingTab = tab.dataset.meetingTab;
       render();
     });
     $("#linkChips").addEventListener("click", (event) => {
