@@ -3004,7 +3004,11 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
   function timeAgo(value) {
     const date = parseDate(value);
     if (!date) return "\u2014";
-    const diff = Math.round((Date.now() - date.getTime()) / 864e5);
+    const today = /* @__PURE__ */ new Date();
+    today.setHours(0, 0, 0, 0);
+    const day = new Date(date);
+    day.setHours(0, 0, 0, 0);
+    const diff = Math.round((today - day) / 864e5);
     if (diff <= 0) return "Hoje";
     if (diff === 1) return "Ontem";
     if (diff < 7) return `H\xE1 ${diff} dias`;
@@ -6602,7 +6606,7 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
   }
   function noticeCard(announcement, index = 0, admin = false, archived = false) {
     const meta = PRIORITIES[announcement.prioridade] || PRIORITIES["Baixa"];
-    const prazoLabel = announcement.prazo ? (archived ? `Arquivado em ${formatDate(announcement.prazo)}` : `No mural at\xE9 ${formatDate(announcement.prazo)}`) : "";
+    const prazoLabel = announcement.prazo ? (archived ? `Ficou dispon\xEDvel de ${formatDate(announcement.data)} at\xE9 ${formatDate(announcement.prazo)}` : `No mural at\xE9 ${formatDate(announcement.prazo)}`) : "";
     return `
     <article class="notice" style="--status-color:${meta.color};animation-delay:${Math.min(index * 50, 300)}ms${archived ? ";opacity:.72" : ""}">
       <div class="notice__head">
@@ -7185,6 +7189,7 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
     const selected = announcement.areas || [];
     const priorityOptions = Object.keys(PRIORITIES).map((priority) => `<option value="${priority}" ${announcement.prioridade === priority ? "selected" : ""}>${priority}</option>`).join("");
     const options = [.../* @__PURE__ */ new Set([...areas, ...selected])].sort((a, b) => a.localeCompare(b, "pt-BR"));
+    const removeBtn = `<button type="button" class="tag-pick__remove" data-remove-area title="Remover esta etiqueta da lista" style="position:relative;z-index:2;display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;margin-left:2px;border:none;border-radius:50%;background:transparent;color:inherit;opacity:.55;cursor:pointer;padding:0">${icon("x", 11)}</button>`;
     const checkboxes = options.map((area) => {
       const { color, soft } = areaColor(area);
       const isOn = selected.includes(area);
@@ -7192,6 +7197,7 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
       <label class="tag-pick ${isOn ? "is-on" : ""}" style="--tag-color:${color};--tag-soft:${soft}">
         <input type="checkbox" value="${escapeHtml(area)}" ${isOn ? "checked" : ""}>
         ${escapeHtml(area)}
+        ${removeBtn}
       </label>`;
     }).join("");
     return `
@@ -7229,7 +7235,7 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
           <input id="newArea" placeholder="Criar outra \xE1rea (ex.: Jur\xEDdico)" style="flex:1">
           <button type="button" class="btn btn--ghost btn--sm" id="addArea">${icon("plus", 14)} Adicionar</button>
         </div>
-        <span class="field__hint">As etiquetas dizem quem \xE9 afetado pelo comunicado \u2014 e depois viram filtro.</span>
+        <span class="field__hint">As etiquetas dizem quem \xE9 afetado pelo comunicado \u2014 e depois viram filtro. Errou o nome? Clique no \xD7 da etiqueta para remov\xEA-la da lista.</span>
         <input type="hidden" name="areas" id="areasValue" value="${escapeHtml(selected.join(", "))}">
       </div>
     </form>`;
@@ -7264,11 +7270,19 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
       label.className = "tag-pick is-on";
       label.style.setProperty("--tag-color", color);
       label.style.setProperty("--tag-soft", soft);
-      label.innerHTML = `<input type="checkbox" value="${escapeHtml(area)}" checked> ${escapeHtml(area)}`;
+      label.innerHTML = `<input type="checkbox" value="${escapeHtml(area)}" checked> ${escapeHtml(area)} <button type="button" class="tag-pick__remove" data-remove-area title="Remover esta etiqueta da lista" style="position:relative;z-index:2;display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;margin-left:2px;border:none;border-radius:50%;background:transparent;color:inherit;opacity:.55;cursor:pointer;padding:0">${icon("x", 11)}</button>`;
       picker.appendChild(label);
       input.value = "";
       sync2();
     };
+    picker.addEventListener("click", (event) => {
+      const removeBtn = event.target.closest("[data-remove-area]");
+      if (!removeBtn) return;
+      event.preventDefault();
+      event.stopPropagation();
+      removeBtn.closest(".tag-pick")?.remove();
+      sync2();
+    });
     add.addEventListener("click", create);
     input.addEventListener("keydown", (event) => {
       if (event.key === "Enter") {
@@ -7761,7 +7775,7 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
       { key: "arquivados", label: "Arquivados", count: archived.length }
     ];
     const tabBar = `
-    <div class="chips" id="noticeViewTabs" style="margin-bottom:16px">
+    <div class="chips" id="noticeViewTabs" style="grid-column:1 / -1;margin-bottom:16px">
       ${tabs.map((tab) => `
         <button class="chip ${view === tab.key ? "is-active" : ""}" data-notice-view="${tab.key}"
                 style="--status-color:var(--primary);--status-soft:var(--primary-soft)">
