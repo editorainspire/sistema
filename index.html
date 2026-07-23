@@ -2602,7 +2602,7 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
           <div class="section-head">
             <div>
               <h1>Comunicados</h1>
-              <p>Avisos internos com as áreas envolvidas, ordenados por prioridade e data.</p>
+              <p>Avisos internos com as áreas envolvidas, ordenados por data de publicação — as etiquetas só sinalizam a prioridade.</p>
             </div>
             <div class="section-head__actions">
               <button class="btn btn--gold" data-action="new-notice">
@@ -2977,6 +2977,20 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
     today.setHours(0, 0, 0, 0);
     date.setHours(0, 0, 0, 0);
     return Math.round((date - today) / 864e5);
+  }
+  /** Um comunicado só arquiva DEPOIS do dia definido em "prazo" — no próprio dia ainda fica no mural. */
+  function isArchivedNotice(announcement) {
+    if (!announcement || !announcement.prazo) return false;
+    const days = daysUntil(announcement.prazo);
+    return days !== null && days < 0;
+  }
+  function splitNotices(announcements) {
+    const active = [];
+    const archived = [];
+    announcements.forEach((item) => {
+      (isArchivedNotice(item) ? archived : active).push(item);
+    });
+    return { active, archived };
   }
   function returnLabel(value) {
     const days = daysUntil(value);
@@ -5825,12 +5839,13 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
         autor: String(pick(row, "autor", "author", "criado por")),
         data: String(pick(row, "data", "date", "criado em") || (/* @__PURE__ */ new Date()).toISOString()),
         prioridade: String(pick(row, "prioridade", "priority") || "M\xE9dia"),
-        areas: normalizeAreas(pick(row, "areas", "\xE1reas", "etiquetas", "tags", "area", "\xE1rea"))
+        areas: normalizeAreas(pick(row, "areas", "\xE1reas", "etiquetas", "tags", "area", "\xE1rea")),
+        prazo: String(pick(row, "prazo", "validade", "expira", "expira em") || "")
       };
     },
     /** A planilha guarda as áreas como texto separado por vírgula — legível para quem abrir o Sheets. */
     toPayload(announcement) {
-      const fields = ["id", "titulo", "mensagem", "autor", "data", "prioridade"];
+      const fields = ["id", "titulo", "mensagem", "autor", "data", "prioridade", "prazo"];
       const payload = {};
       fields.forEach((field) => {
         let value = announcement[field];
@@ -6585,10 +6600,11 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
       </div>
     </article>`;
   }
-  function noticeCard(announcement, index = 0, admin = false) {
+  function noticeCard(announcement, index = 0, admin = false, archived = false) {
     const meta = PRIORITIES[announcement.prioridade] || PRIORITIES["Baixa"];
+    const prazoLabel = announcement.prazo ? (archived ? `Arquivado em ${formatDate(announcement.prazo)}` : `No mural at\xE9 ${formatDate(announcement.prazo)}`) : "";
     return `
-    <article class="notice" style="--status-color:${meta.color};animation-delay:${Math.min(index * 50, 300)}ms">
+    <article class="notice" style="--status-color:${meta.color};animation-delay:${Math.min(index * 50, 300)}ms${archived ? ";opacity:.72" : ""}">
       <div class="notice__head">
         <h3 class="notice__title">${escapeHtml(announcement.titulo)}</h3>
         ${priorityBadge(announcement.prioridade)}
@@ -6599,6 +6615,7 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
         <span>${escapeHtml(announcement.autor || "Equipe Inspire")}</span>
         <span class="dot"></span>
         <span>${escapeHtml(timeAgo(announcement.data))}</span>
+        ${prazoLabel ? `<span class="dot"></span><span>${escapeHtml(prazoLabel)}</span>` : ""}
         ${admin ? `
           <span class="notice__admin">
             <button data-action="edit-notice" data-id="${escapeHtml(announcement.id)}" title="Editar comunicado">${icon("edit", 14)}</button>
@@ -6863,10 +6880,19 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
     onKeydown(event) {
       if (event.key === "Escape") Modal.close();
     },
-    /** Coleta os campos [name] do modal em um objeto. */
+    /** Coleta os campos [name] do modal em um objeto.
+     *  Bug corrigido: havia vários <input> com o mesmo "name" nos grupos de rádio (cor e
+     *  ícone das categorias). O forEach passava por todos e o ÚLTIMO do DOM sempre vencia,
+     *  mesmo quando outro estava marcado — por isso a categoria "parecia" editada (o círculo
+     *  ficava selecionado na tela) mas gravava sempre a mesma cor/ícone. Agora, para radio,
+     *  só o que está `checked` é considerado; os demais do grupo são ignorados. */
     formData() {
       const data = {};
       root().querySelectorAll("[name]").forEach((field) => {
+        if (field.type === "radio") {
+          if (field.checked) data[field.name] = field.value;
+          return;
+        }
         data[field.name] = field.value.trim ? field.value.trim() : field.value;
       });
       return data;
@@ -7187,6 +7213,11 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
       <div class="field">
         <label class="field__label" for="n-prio">Prioridade</label>
         <select id="n-prio" name="prioridade">${priorityOptions}</select>
+      </div>
+      <div class="field span-2">
+        <label class="field__label" for="n-prazo">Fica no mural at\xE9 (opcional)</label>
+        <input id="n-prazo" name="prazo" type="date" value="${escapeHtml(toInputDate(announcement.prazo))}">
+        <span class="field__hint">Depois desse dia o comunicado sai do mural e vai para "Arquivados" automaticamente. Deixe em branco para n\xE3o arquivar sozinho.</span>
       </div>
 
       <div class="field span-2">
@@ -7722,25 +7753,38 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
       </div>
     </div>`;
   }
-  function renderNotices(container, announcements, admin = false, pinned = null) {
-    if (!announcements.length && !pinned) {
-      container.innerHTML = `
+  function renderNoticesSection(container, allAnnouncements, options = {}) {
+    const { admin = false, area = "", view = "ativos", pinned = null } = options;
+    const { active, archived } = splitNotices(allAnnouncements);
+    const tabs = [
+      { key: "ativos", label: "Ativos", count: active.length },
+      { key: "arquivados", label: "Arquivados", count: archived.length }
+    ];
+    const tabBar = `
+    <div class="chips" id="noticeViewTabs" style="margin-bottom:16px">
+      ${tabs.map((tab) => `
+        <button class="chip ${view === tab.key ? "is-active" : ""}" data-notice-view="${tab.key}"
+                style="--status-color:var(--primary);--status-soft:var(--primary-soft)">
+          ${escapeHtml(tab.label)} <span class="chip__count">${tab.count}</span>
+        </button>`).join("")}
+    </div>`;
+    const isArchivedView = view === "arquivados";
+    const source = isArchivedView ? archived : active;
+    const list = filterNotices(source, area);
+    const showPinned = !isArchivedView && !area ? pinned : null;
+    if (!list.length && !showPinned) {
+      container.innerHTML = tabBar + `
       <div class="empty">
         <div class="empty__icon">${icon("megaphone", 24)}</div>
-        <h3>Nenhum comunicado publicado</h3>
-        <p>Publique o primeiro aviso para que toda a equipe veja ao abrir o sistema.</p>
-        <button class="btn btn--primary" data-action="new-notice">${icon("plus", 16)} Publicar comunicado</button>
+        <h3>${isArchivedView ? "Nenhum comunicado arquivado" : "Nenhum comunicado publicado"}</h3>
+        <p>${isArchivedView ? "Comunicados cujo prazo no mural j\xE1 passou ficam guardados aqui para consulta." : "Publique o primeiro aviso para que toda a equipe veja ao abrir o sistema."}</p>
+        ${isArchivedView ? "" : `<button class="btn btn--primary" data-action="new-notice">${icon("plus", 16)} Publicar comunicado</button>`}
       </div>`;
       return;
     }
-    const weight = { "Alta": 0, "M\xE9dia": 1, "Baixa": 2 };
-    const ordered = [...announcements].sort((a, b) => {
-      const byPriority = (weight[a.prioridade] ?? 3) - (weight[b.prioridade] ?? 3);
-      if (byPriority !== 0) return byPriority;
-      return new Date(b.data) - new Date(a.data);
-    });
-    const pinnedHtml = pinned ? `<div class="notices__pinned">${birthdayNoticeCard(pinned)}</div>` : "";
-    container.innerHTML = pinnedHtml + ordered.map((announcement, index) => noticeCard(announcement, index, admin)).join("");
+    const ordered = [...list].sort((a, b) => (parseDate(b.data) || 0) - (parseDate(a.data) || 0));
+    const pinnedHtml = showPinned ? `<div class="notices__pinned">${birthdayNoticeCard(showPinned)}</div>` : "";
+    container.innerHTML = tabBar + pinnedHtml + ordered.map((announcement, index) => noticeCard(announcement, index, admin, isArchivedView)).join("");
   }
   function filterNotices(announcements, area) {
     if (!area) return announcements;
@@ -7895,6 +7939,7 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
     meetingTab: "proximas",
     filters: { search: "", status: "Todos", departamento: "", equipe: "", cargo: "", responsavel: "" },
     noticeArea: "",
+    noticeView: "ativos",
     linkCategory: "",
     view: "dashboard",
     layout: "grid",
@@ -7998,20 +8043,21 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
     renderKPIs($("#kpis"), stats, state.filters.status);
     renderChips($("#chips"), stats, state.filters.status);
     renderFilterSelects(state.employees, state.filters);
-    renderHighlight($("#highlight"), party ? [] : state.announcements);
+    const { active: activeNotices } = splitNotices(state.announcements);
+    renderHighlight($("#highlight"), party ? [] : activeNotices);
     renderBirthdays($("#birthdays"), state.employees);
     const filtered = sortEmployees(applyFilters(state.employees, state.filters, slugify));
     renderEmployees(filtered);
     const areas = areasInUse(state.announcements);
     $("#areaFilters").classList.toggle("hidden", !areas.length);
     renderAreaChips($("#areaChips"), state.announcements, state.noticeArea);
-    renderNotices(
-      $("#noticeGrid"),
-      filterNotices(state.announcements, state.noticeArea),
-      true,
-      state.noticeArea ? null : party
-      // com filtro de área ativo, o automático sai da frente
-    );
+    renderNoticesSection($("#noticeGrid"), state.announcements, {
+      admin: true,
+      area: state.noticeArea,
+      view: state.noticeView,
+      pinned: party
+      // com filtro de área ativo, ou na aba Arquivados, o automático sai da frente
+    });
     renderLinkChips($("#linkChips"), state.links, state.linkCategory);
     renderLinks($("#linkGrid"), state.links, state.linkCategory);
     renderMeetingStrip($("#meetingStrip"), state.meetings, state.employees);
@@ -8021,7 +8067,7 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
     $("#navCountMeetings").textContent = state.meetings.length;
     $("#dl-dept").innerHTML = [...new Set(state.employees.map((e) => e.departamento).filter(Boolean))].map((dept) => `<option value="${escapeHtml(dept)}">`).join("");
     $("#navCountTeam").textContent = stats.total;
-    $("#navCountNotices").textContent = state.announcements.length;
+    $("#navCountNotices").textContent = activeNotices.length;
     $("#resultCount").innerHTML = `<strong>${filtered.length}</strong> de ${stats.total} colaboradores \xB7 <strong>${stats.ausentes}</strong> fora hoje`;
     $("#printDate").textContent = `${formatToday()} \xB7 ${stats.presentes} dispon\xEDveis \xB7 ${stats.ausentes} ausentes`;
   }
@@ -8714,6 +8760,12 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
       const chip = event.target.closest(".chip");
       if (!chip) return;
       state.noticeArea = chip.dataset.area;
+      render();
+    });
+    $("#noticeGrid").addEventListener("click", (event) => {
+      const tab = event.target.closest("[data-notice-view]");
+      if (!tab) return;
+      state.noticeView = tab.dataset.noticeView;
       render();
     });
     $("#agenda").addEventListener("click", (event) => {
