@@ -2979,6 +2979,12 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
     return Math.round((date - today) / 864e5);
   }
   /** Um comunicado só arquiva DEPOIS do dia definido em "prazo" — no próprio dia ainda fica no mural. */
+  /** O id do comunicado é gerado como "com_<timestamp em ms>" — dá pra usar isso
+   *  pra desempatar a ordem quando dois foram publicados no mesmo dia. */
+  function noticeCreatedAt(announcement) {
+    const match = String(announcement?.id || "").match(/_(\d{10,})$/);
+    return match ? Number(match[1]) : null;
+  }
   function isArchivedNotice(announcement) {
     if (!announcement || !announcement.prazo) return false;
     const days = daysUntil(announcement.prazo);
@@ -7796,7 +7802,20 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
       </div>`;
       return;
     }
-    const ordered = [...list].sort((a, b) => (parseDate(b.data) || 0) - (parseDate(a.data) || 0));
+    const ordered = list
+      .map((item, i) => ({ item, i }))
+      .sort((a, b) => {
+        const dateDiff = (parseDate(b.item.data) || 0) - (parseDate(a.item.data) || 0);
+        if (dateDiff !== 0) return dateDiff;
+        // Mesma data (a planilha só guarda o dia, não a hora): desempata pelo horário
+        // exato de cria\xE7\xE3o embutido no id (ex.: "com_1753274460123") e, se n\xE3o houver,
+        // pela ordem de chegada \u2014 sempre com o mais recente primeiro.
+        const at = noticeCreatedAt(a.item);
+        const bt = noticeCreatedAt(b.item);
+        if (at !== null && bt !== null && at !== bt) return bt - at;
+        return b.i - a.i;
+      })
+      .map((entry) => entry.item);
     const pinnedHtml = showPinned ? `<div class="notices__pinned">${birthdayNoticeCard(showPinned)}</div>` : "";
     container.innerHTML = tabBar + pinnedHtml + ordered.map((announcement, index) => noticeCard(announcement, index, admin, isArchivedView)).join("");
   }
