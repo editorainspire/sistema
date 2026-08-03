@@ -2361,6 +2361,15 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
 .print-header p { font-size: 12px; color: #555; }
 
   </style>
+  <script>
+    // ==========================================================================
+    // CONFIGURAÇÃO — preencha com os dados do seu projeto Supabase.
+    // Estes três valores são tudo que muda entre ambientes.
+    // ==========================================================================
+    window.__SUPABASE_FN__   = "https://ssuubluyrerzslylijfd.supabase.co/functions/v1/api"; // URL da Edge Function
+    window.__SUPABASE_ANON__ = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNzdXVibHV5cmVyenNseWxpamZkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3NzM5NjgsImV4cCI6MjEwMTM0OTk2OH0.RC_ymCNC52YkfWdCt-j7YCnEPm-po8yzD2B0U59Yva8";   // Project Settings › API › anon public
+    window.__ADMIN_TOKEN__   = "inspire_6ZMqPjrcZ_9XqlLknui2XekSI4_3XuPY";               // mesmo valor de ADMIN_TOKEN na função (vazio = só leitura)
+  </script>
 </head>
 
 <body>
@@ -2780,6 +2789,7 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
   <datalist id="dl-dept"></datalist>
 
   <script>
+
 (() => {
   var __create = Object.create;
   var __defProp = Object.defineProperty;
@@ -5725,669 +5735,190 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
     return text.replace(".", "").replace(/^\w/, (c) => c.toUpperCase());
   }
 
-  // js/api.js
+  // js/api.js  (adaptador Supabase — substitui o antigo cliente Google Apps Script)
   var CONFIG = {
-    /** Endpoint do Google Apps Script (Implantar › Aplicativo da Web › Qualquer pessoa). */
-    endpoint: "https://script.google.com/macros/s/AKfycbx3tmuctLyqyDqaJRaZ25djUkvFc5oBmW0Is3bB-rcJWEyE_J0qrZt9ccfBvGq6c0-y/exec",
-    timeout: 12e3,
-    // ms por tentativa
+    // URL da Edge Function (uma URL só). Ex.: https://xxxx.supabase.co/functions/v1/api
+    endpoint: window.__SUPABASE_FN__ || "https://ssuubluyrerzslylijfd.supabase.co/functions/v1/api",
+    // Chave anônima do projeto (pública, pode ficar no front).
+    anonKey: window.__SUPABASE_ANON__ || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNzdXVibHV5cmVyenNseWxpamZkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3NzM5NjgsImV4cCI6MjEwMTM0OTk2OH0.RC_ymCNC52YkfWdCt-j7YCnEPm-po8yzD2B0U59Yva8",
+    // Token de administrador (mesmo valor de ADMIN_TOKEN na função). Habilita escrita.
+    adminToken: window.__ADMIN_TOKEN__ || "",
+    timeout: 15e3,
     retries: 2,
-    // tentativas extras em falha de rede
-    retryDelay: 900,
-    // ms entre tentativas (backoff exponencial)
+    retryDelay: 800,
     pollInterval: 3e4,
-    // atualização automática
-    /** Se o endpoint estiver indisponível, o sistema entra em modo demonstração
-     *  (dados de exemplo em memória, somente para avaliar a interface). */
-    demoFallback: true
+    demoFallback: false
   };
-  var ApiError = class extends Error {
-    constructor(message, { code = "unknown", cause = null } = {}) {
+
+  class ApiError extends Error {
+    constructor(message, { code = "unknown" } = {}) {
       super(message);
       this.name = "ApiError";
       this.code = code;
-      this.cause = cause;
     }
-  };
+  }
+
   var FRIENDLY = {
-    timeout: "O servidor demorou para responder. Verifique sua conex\xE3o e tente novamente.",
-    offline: "Voc\xEA est\xE1 sem conex\xE3o. Reconecte-se para sincronizar os dados.",
-    network: "N\xE3o foi poss\xEDvel falar com a planilha. Confira a publica\xE7\xE3o do Apps Script.",
-    server: "A planilha respondeu com erro. Confira as permiss\xF5es do Apps Script.",
-    parse: "A resposta da planilha veio em um formato inesperado."
+    timeout: "O servidor demorou para responder. Verifique sua conexão e tente novamente.",
+    offline: "Você está sem conexão. Reconecte-se para sincronizar os dados.",
+    network: "Não foi possível falar com o servidor. Confira a URL da função.",
+    server: "O servidor respondeu com erro.",
+    auth: "Ação restrita ao administrador. Confira o token de acesso.",
+    parse: "A resposta do servidor veio em formato inesperado."
   };
+
   function friendlyMessage(error) {
     if (error instanceof ApiError) return FRIENDLY[error.code] || error.message;
-    return error?.message || "Algo deu errado. Tente novamente.";
+    return (error && error.message) || "Algo deu errado. Tente novamente.";
   }
-  var pick = (row, ...keys) => {
-    for (const key of keys) {
-      const found = Object.keys(row).find((k) => k.trim().toLowerCase() === key.toLowerCase());
-      if (found && row[found] !== "" && row[found] !== null && row[found] !== void 0) return row[found];
-    }
-    return "";
-  };
-  var EmployeeMapper = {
-    /** Linha da planilha (em qualquer convenção de nomes) → objeto do sistema. */
-    toModel(row = {}) {
-      return {
-        id: String(pick(row, "id", "ID", "codigo", "c\xF3digo") || uid("emp")),
-        nome: String(pick(row, "nome", "name", "colaborador")),
-        cargo: String(pick(row, "cargo", "role", "position", "funcao", "fun\xE7\xE3o")),
-        departamento: String(pick(row, "departamento", "department", "setor", "area", "\xE1rea")),
-        equipe: String(pick(row, "equipe", "team", "time")),
-        gestor: String(pick(row, "gestor", "manager", "lider", "l\xEDder")),
-        telefone: String(pick(row, "telefone", "phone", "celular", "ramal")),
-        email: String(pick(row, "email", "e-mail", "mail")),
-        foto: String(pick(row, "foto", "photo", "avatar", "imagem")),
-        status: String(pick(row, "status", "situacao", "situa\xE7\xE3o") || "Presencial"),
-        dataSaida: String(pick(row, "dataSaida", "data_saida", "data de sa\xEDda", "data saida", "saida", "inicio", "in\xEDcio")),
-        dataRetorno: String(pick(row, "dataRetorno", "data_retorno", "data de retorno", "data retorno", "retorno", "fim")),
-        responsavel: String(pick(row, "responsavel", "respons\xE1vel", "substituto", "backup", "quem responde")),
-        motivo: String(pick(row, "motivo", "reason", "motivo da aus\xEAncia", "motivo da ausencia")),
-        dataAdmissao: String(pick(row, "dataAdmissao", "data_admissao", "admissao", "admiss\xE3o", "data de admiss\xE3o")),
-        aniversario: String(pick(row, "aniversario", "anivers\xE1rio", "nascimento", "data de nascimento", "birthday", "dataNascimento")),
-        observacoes: String(pick(row, "observacoes", "observa\xE7\xF5es", "obs", "notes")),
-        historico: normalizeHistory(pick(row, "historico", "hist\xF3rico", "history")),
-        atualizadoEm: String(pick(row, "atualizadoEm", "updated_at", "atualizado em"))
-      };
-    },
-    /**
-     * Objeto do sistema → payload aceito pelo Apps Script.
-     * Sempre inclui TODOS os campos do modelo. Um campo ausente vira '' explícito,
-     * para que "aniversário apagado" ou "sem responsável" cheguem como vazio
-     * em vez de fazerem o backend preservar o valor antigo.
-     */
-    toPayload(employee) {
-      const fields = [
-        "id",
-        "nome",
-        "cargo",
-        "departamento",
-        "equipe",
-        "gestor",
-        "telefone",
-        "email",
-        "foto",
-        "status",
-        "dataSaida",
-        "dataRetorno",
-        "responsavel",
-        "motivo",
-        "dataAdmissao",
-        "aniversario",
-        "observacoes",
-        "historico",
-        "atualizadoEm"
-      ];
-      const payload = {};
-      fields.forEach((field) => {
-        let value = employee[field];
-        if (value === null || value === void 0) value = "";
-        payload[field] = value;
-      });
-      if (Array.isArray(payload.historico)) payload.historico = JSON.stringify(payload.historico);
-      return payload;
-    }
-  };
-  function normalizeHistory(value) {
-    if (Array.isArray(value)) return value;
-    if (!value) return [];
+
+  // Uma única função que conversa com o backend.
+  async function call(action, payload = {}, attempt = 0) {
+    if (!navigator.onLine) throw new ApiError(FRIENDLY.offline, { code: "offline" });
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), CONFIG.timeout);
     try {
-      const parsed = JSON.parse(value);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return String(value).split("|").filter(Boolean).map((entry) => ({ data: "", titulo: entry.trim(), status: "" }));
-    }
-  }
-  var AnnouncementMapper = {
-    toModel(row = {}) {
-      return {
-        id: String(pick(row, "id", "ID") || uid("com")),
-        titulo: String(pick(row, "titulo", "t\xEDtulo", "title", "assunto")),
-        mensagem: String(pick(row, "mensagem", "message", "texto", "conteudo", "conte\xFAdo")),
-        autor: String(pick(row, "autor", "author", "criado por")),
-        data: String(pick(row, "data", "date", "criado em") || (/* @__PURE__ */ new Date()).toISOString()),
-        prioridade: String(pick(row, "prioridade", "priority") || "M\xE9dia"),
-        areas: normalizeAreas(pick(row, "areas", "\xE1reas", "etiquetas", "tags", "area", "\xE1rea")),
-        prazo: String(pick(row, "prazo", "validade", "expira", "expira em") || "")
-      };
-    },
-    /** A planilha guarda as áreas como texto separado por vírgula — legível para quem abrir o Sheets. */
-    toPayload(announcement) {
-      const fields = ["id", "titulo", "mensagem", "autor", "data", "prioridade", "prazo"];
-      const payload = {};
-      fields.forEach((field) => {
-        let value = announcement[field];
-        if (value === null || value === void 0) value = "";
-        payload[field] = value;
-      });
-      payload.areas = Array.isArray(announcement.areas) ? announcement.areas.join(", ") : announcement.areas || "";
-      return payload;
-    }
-  };
-  var LinkMapper = {
-    toModel(row = {}) {
-      return {
-        id: String(pick(row, "id", "ID") || uid("lnk")),
-        titulo: String(pick(row, "titulo", "t\xEDtulo", "title", "nome")),
-        url: String(pick(row, "url", "link", "endereco", "endere\xE7o")),
-        descricao: String(pick(row, "descricao", "descri\xE7\xE3o", "description", "obs")),
-        categoria: String(pick(row, "categoria", "category", "tipo") || "Outro"),
-        ordem: Number(pick(row, "ordem", "order") || 0)
-      };
-    },
-    toPayload(link) {
-      return { ...link };
-    }
-  };
-  var CategoryMapper = {
-    toModel(row = {}) {
-      return {
-        id: String(pick(row, "id", "ID") || uid("cat")),
-        nome: String(pick(row, "nome", "name", "categoria", "titulo")),
-        cor: String(pick(row, "cor", "color") || "#9AA1AB"),
-        icone: String(pick(row, "icone", "\xEDcone", "icon") || "link"),
-        ordem: Number(pick(row, "ordem", "order") || 0)
-      };
-    },
-    toPayload(category) {
-      return { ...category };
-    }
-  };
-  var MeetingMapper = {
-    toModel(row = {}) {
-      var participantes = pick(row, "participantes", "participants", "equipe");
-      return {
-        id: String(pick(row, "id", "ID") || uid("reu")),
-        titulo: String(pick(row, "titulo", "t\xEDtulo", "title", "assunto")),
-        data: String(pick(row, "data", "date", "dia")),
-        inicio: String(pick(row, "inicio", "in\xEDcio", "hora", "start") || "09:00"),
-        fim: String(pick(row, "fim", "end", "termino", "t\xE9rmino") || "10:00"),
-        modo: String(pick(row, "modo", "mode", "tipo") || "Presencial"),
-        local: String(pick(row, "local", "sala", "location")),
-        link: String(pick(row, "link", "url", "meet")),
-        criadoPor: String(pick(row, "criadoPor", "criado_por", "criado por", "autor", "organizador")),
-        participantes: normalizeAreas(participantes),
-        // reaproveita o parser de lista
-        externos: String(pick(row, "externos", "convidados", "externals", "participantes externos")),
-        pauta: String(pick(row, "pauta", "agenda", "observacoes", "observa\xE7\xF5es", "obs")),
-        status: String(pick(row, "status", "situacao", "situa\xE7\xE3o") || "Agendada"),
-        ata: String(pick(row, "ata", "notas", "registro", "pontos", "minutes"))
-      };
-    },
-    toPayload(meeting) {
-      const fields = [
-        "id",
-        "titulo",
-        "data",
-        "inicio",
-        "fim",
-        "modo",
-        "local",
-        "link",
-        "criadoPor",
-        "externos",
-        "pauta",
-        "status",
-        "ata"
-      ];
-      const payload = {};
-      fields.forEach((field) => {
-        let value = meeting[field];
-        if (value === null || value === void 0) value = "";
-        payload[field] = value;
-      });
-      payload.participantes = Array.isArray(meeting.participantes) ? meeting.participantes.join(", ") : meeting.participantes || "";
-      return payload;
-    }
-  };
-  var HttpClient = class {
-    constructor(config) {
-      this.config = config;
-    }
-    /** GET com query string. */
-    get(params) {
-      const url = `${this.config.endpoint}?${new URLSearchParams({ ...params, _: Date.now() })}`;
-      return this.#send(url, { method: "GET" });
-    }
-    /**
-     * POST para Apps Script.
-     * Content-Type text/plain evita o preflight CORS (que o Apps Script não responde).
-     */
-    post(action, payload = {}) {
-      return this.#send(this.config.endpoint, {
+      const res = await fetch(CONFIG.endpoint, {
         method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ action, ...payload })
+        signal: controller.signal,
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + CONFIG.anonKey,
+          "apikey": CONFIG.anonKey,
+          "x-admin-token": CONFIG.adminToken
+        },
+        body: JSON.stringify({ action, payload })
       });
-    }
-    /**
-     * POST de um registro.
-     * O envelope leva os campos no topo (compatibilidade) E o objeto em `record`.
-     * `record` é um nome que nunca colide com um campo do modelo — ao contrário de `data`,
-     * que é o nome do campo de data dos comunicados e sobrescrevia o envelope.
-     */
-    postRecord(action, record) {
-      var flat = {};
-      Object.keys(record).forEach(function(key) {
-        var value = record[key];
-        if (value === null || value === void 0) value = "";
-        else if (Array.isArray(value)) value = value.join(", ");
-        else if (typeof value === "object") value = JSON.stringify(value);
-        flat[key] = value;
-      });
-      return this.post(action, { ...flat, id: flat.id || "", record: flat, data: flat });
-    }
-    /** Requisição crua, sem retry nem parse — usada pelo diagnóstico. */
-    async raw(params) {
-      const url = `${this.config.endpoint}?${new URLSearchParams(params)}`;
-      const response = await fetch(url, { method: "GET", redirect: "follow", cache: "no-store" });
-      const text = await response.text();
-      return {
-        status: response.status,
-        contentType: response.headers.get("content-type") || "(sem content-type)",
-        text: text.slice(0, 1200)
-      };
-    }
-    async #send(url, options, attempt = 0) {
-      if (!navigator.onLine) throw new ApiError(FRIENDLY.offline, { code: "offline" });
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), this.config.timeout);
-      try {
-        const response = await fetch(url, {
-          ...options,
-          signal: controller.signal,
-          redirect: "follow",
-          cache: "no-store"
-        });
-        if (!response.ok) throw new ApiError(`HTTP ${response.status}`, { code: "server" });
-        const text = await response.text();
-        return this.#parse(text);
-      } catch (error) {
-        const retriable = error.name === "AbortError" || error instanceof TypeError || error.code === "server";
-        if (retriable && attempt < this.config.retries) {
-          await new Promise((r) => setTimeout(r, this.config.retryDelay * (attempt + 1)));
-          return this.#send(url, options, attempt + 1);
-        }
-        if (error.name === "AbortError") throw new ApiError(FRIENDLY.timeout, { code: "timeout", cause: error });
-        if (error instanceof ApiError) throw error;
-        throw new ApiError(FRIENDLY.network, { code: "network", cause: error });
-      } finally {
-        clearTimeout(timer);
-      }
-    }
-    /** Aceita { data: [] }, { result: [] }, [] ou { success, data }. */
-    #parse(text) {
+
+      if (res.status === 401) throw new ApiError(FRIENDLY.auth, { code: "auth" });
+      if (!res.ok && res.status >= 500) throw new ApiError("HTTP " + res.status, { code: "server" });
+
+      const text = await res.text();
       let json;
-      try {
-        json = JSON.parse(text);
-      } catch {
-        throw new ApiError(FRIENDLY.parse, { code: "parse" });
-      }
-      if (json && json.success === false) {
-        throw new ApiError(json.message || json.error || FRIENDLY.server, { code: "server" });
-      }
-      return json;
-    }
-  };
-  function extractList(response) {
-    if (Array.isArray(response)) return response;
-    for (const key of ["data", "result", "items", "rows", "records", "colaboradores", "employees", "comunicados", "announcements"]) {
-      if (Array.isArray(response?.[key])) return response[key];
-    }
-    return [];
-  }
-  var Demo = {
-    active: false,
-    employees: [],
-    announcements: [],
-    links: [],
-    categories: [],
-    meetings: [],
-    seed() {
-      const iso = (offsetDays) => {
-        const d = /* @__PURE__ */ new Date();
-        d.setDate(d.getDate() + offsetDays);
-        return d.toISOString().slice(0, 10);
-      };
-      this.employees = [
-        { id: "1", aniversario: "1985-07-14", nome: "Ana Beatriz Moraes", cargo: "Diretora Editorial", departamento: "Editorial", equipe: "Lideran\xE7a", gestor: "Conselho", telefone: "(11) 98812-4471", email: "ana.moraes@inspire.com.br", foto: "", status: "Presencial", dataSaida: "", dataRetorno: "", responsavel: "", motivo: "", dataAdmissao: "2019-03-11", observacoes: "Aprova capas \xE0s ter\xE7as.", historico: [{ data: iso(-40), titulo: "Retornou de f\xE9rias", status: "Presencial" }] },
-        { id: "2", aniversario: "1990-07-22", nome: "Carlos Eduardo Lima", cargo: "Editor S\xEAnior", departamento: "Editorial", equipe: "Livros", gestor: "Ana Beatriz Moraes", telefone: "(11) 99120-3388", email: "carlos.lima@inspire.com.br", foto: "", status: "F\xE9rias", dataSaida: iso(-9), dataRetorno: iso(6), responsavel: "Marina Alves", motivo: "F\xE9rias programadas", dataAdmissao: "2020-07-02", observacoes: "Revis\xF5es urgentes v\xE3o para a Marina.", historico: [{ data: iso(-9), titulo: "Entrou em f\xE9rias", status: "F\xE9rias" }] },
-        { id: "3", aniversario: "1993-03-08", nome: "Marina Alves", cargo: "Editora de Texto", departamento: "Editorial", equipe: "Livros", gestor: "Ana Beatriz Moraes", telefone: "(11) 99771-2210", email: "marina.alves@inspire.com.br", foto: "", status: "Home Office", dataSaida: "", dataRetorno: "", responsavel: "", motivo: "", dataAdmissao: "2021-01-18", observacoes: "", historico: [] },
-        { id: "4", aniversario: "1995-11-30", nome: "Rafael Nogueira", cargo: "Designer Gr\xE1fico", departamento: "Cria\xE7\xE3o", equipe: "Capas", gestor: "Juliana Prado", telefone: "(11) 98444-9012", email: "rafael.nogueira@inspire.com.br", foto: "", status: "Viagem", dataSaida: iso(-1), dataRetorno: iso(2), responsavel: "Juliana Prado", motivo: "Bienal do Livro \u2014 montagem do estande", dataAdmissao: "2022-05-09", observacoes: "", historico: [{ data: iso(-1), titulo: "Viagem \xE0 Bienal", status: "Viagem" }] },
-        { id: "5", aniversario: "1988-07-03", nome: "Juliana Prado", cargo: "Head de Cria\xE7\xE3o", departamento: "Cria\xE7\xE3o", equipe: "Lideran\xE7a", gestor: "Ana Beatriz Moraes", telefone: "(11) 97665-1180", email: "juliana.prado@inspire.com.br", foto: "", status: "Presencial", dataSaida: "", dataRetorno: "", responsavel: "", motivo: "", dataAdmissao: "2018-11-26", observacoes: "", historico: [] },
-        { id: "6", aniversario: "1997-05-19", nome: "Pedro Henrique Souza", cargo: "Analista de Marketing", departamento: "Marketing", equipe: "Growth", gestor: "Camila Ferraz", telefone: "(11) 98220-7745", email: "pedro.souza@inspire.com.br", foto: "", status: "Treinamento", dataSaida: iso(0), dataRetorno: iso(1), responsavel: "Camila Ferraz", motivo: "Imers\xE3o de m\xEDdia paga", dataAdmissao: "2023-02-13", observacoes: "", historico: [] },
-        { id: "7", aniversario: "1991-07-27", nome: "Camila Ferraz", cargo: "Gerente de Marketing", departamento: "Marketing", equipe: "Lideran\xE7a", gestor: "Ana Beatriz Moraes", telefone: "(11) 99003-6621", email: "camila.ferraz@inspire.com.br", foto: "", status: "Presencial", dataSaida: "", dataRetorno: "", responsavel: "", motivo: "", dataAdmissao: "2020-09-01", observacoes: "", historico: [] },
-        { id: "8", aniversario: "1994-09-12", nome: "Diego Martins", cargo: "Analista Comercial", departamento: "Comercial", equipe: "Distribuidores", gestor: "Sandra Reis", telefone: "(11) 98150-3399", email: "diego.martins@inspire.com.br", foto: "", status: "Afastado", dataSaida: iso(-14), dataRetorno: iso(16), responsavel: "Sandra Reis", motivo: "Licen\xE7a m\xE9dica", dataAdmissao: "2021-06-21", observacoes: "Contatos de clientes com a Sandra.", historico: [{ data: iso(-14), titulo: "In\xEDcio do afastamento", status: "Afastado" }] },
-        { id: "9", aniversario: "1986-01-25", nome: "Sandra Reis", cargo: "Gerente Comercial", departamento: "Comercial", equipe: "Lideran\xE7a", gestor: "Ana Beatriz Moraes", telefone: "(11) 97112-8804", email: "sandra.reis@inspire.com.br", foto: "", status: "Home Office", dataSaida: "", dataRetorno: "", responsavel: "", motivo: "", dataAdmissao: "2019-08-05", observacoes: "", historico: [] },
-        { id: "10", aniversario: "1999-07-09", nome: "Lucas Ribeiro", cargo: "Assistente Administrativo", departamento: "Administrativo", equipe: "Opera\xE7\xF5es", gestor: "Sandra Reis", telefone: "(11) 98776-2244", email: "lucas.ribeiro@inspire.com.br", foto: "", status: "Banco de Horas", dataSaida: iso(0), dataRetorno: iso(0), responsavel: "Lucas Ribeiro", motivo: "Compensa\xE7\xE3o de horas", dataAdmissao: "2023-10-16", observacoes: "", historico: [] },
-        { id: "11", aniversario: "1992-12-04", nome: "Fernanda Costa", cargo: "Revisora", departamento: "Editorial", equipe: "Revis\xE3o", gestor: "Carlos Eduardo Lima", telefone: "(11) 99332-5518", email: "fernanda.costa@inspire.com.br", foto: "", status: "Presencial", dataSaida: "", dataRetorno: "", responsavel: "", motivo: "", dataAdmissao: "2022-02-07", observacoes: "", historico: [] },
-        { id: "12", aniversario: "1996-02-17", nome: "Thiago Barbosa", cargo: "Ilustrador", departamento: "Cria\xE7\xE3o", equipe: "Infantil", gestor: "Juliana Prado", telefone: "(11) 98009-4432", email: "thiago.barbosa@inspire.com.br", foto: "", status: "Folga", dataSaida: iso(0), dataRetorno: iso(1), responsavel: "Rafael Nogueira", motivo: "Folga por feriado trabalhado", dataAdmissao: "2024-04-22", observacoes: "", historico: [] }
-      ];
-      this.categories = DEFAULT_CATEGORIES.map((category) => ({ ...category }));
-      this.links = [
-        { id: "l1", titulo: "Site institucional", url: "https://lojainspire.com.br", descricao: "Loja e cat\xE1logo p\xFAblico da editora.", categoria: "Site", ordem: 1 },
-        { id: "l2", titulo: "Reposit\xF3rio do sistema", url: "https://github.com", descricao: "C\xF3digo do Inspire Presence no GitHub.", categoria: "Reposit\xF3rio", ordem: 2 },
-        { id: "l3", titulo: "Drive da equipe", url: "https://drive.google.com", descricao: "Contratos, capas aprovadas e originais.", categoria: "Diret\xF3rio", ordem: 3 },
-        { id: "l4", titulo: "Instagram", url: "https://instagram.com", descricao: "Perfil oficial da Editora Inspire.", categoria: "Rede social", ordem: 4 },
-        { id: "l5", titulo: "Planilha de presen\xE7a", url: "https://docs.google.com/spreadsheets", descricao: "Banco de dados deste painel.", categoria: "Sistema", ordem: 5 },
-        { id: "l6", titulo: "Manual de identidade", url: "https://drive.google.com", descricao: "Cores, tipografia e uso do logo.", categoria: "Documento", ordem: 6 }
-      ];
-      const isoDay = (offset) => {
-        const d = /* @__PURE__ */ new Date();
-        d.setDate(d.getDate() + offset);
-        return d.toISOString().slice(0, 10);
-      };
-      this.meetings = [
-        { id: "r1", titulo: "Reuni\xE3o de pauta editorial", data: isoDay(0), inicio: "10:00", fim: "11:00", modo: "Presencial", local: "Sala 2", link: "", criadoPor: "Ana Beatriz Moraes", participantes: "2, 3, 11", externos: "", pauta: "Definir capa do pr\xF3ximo lan\xE7amento.", status: "Agendada", ata: "" },
-        { id: "r2", titulo: "Alinhamento de marketing", data: isoDay(1), inicio: "14:00", fim: "15:00", modo: "Online", local: "", link: "https://meet.google.com/abc-defg-hij", criadoPor: "Camila Ferraz", participantes: "6, 7", externos: "Ag\xEAncia Norte", pauta: "Campanhas do trimestre.", status: "Agendada", ata: "" },
-        { id: "r3", titulo: "Retrospectiva do m\xEAs", data: isoDay(-4), inicio: "09:30", fim: "10:30", modo: "H\xEDbrida", local: "Audit\xF3rio", link: "https://meet.google.com/xyz-1234-abc", criadoPor: "Juliana Prado", participantes: "4, 5, 1", externos: "", pauta: "O que funcionou e o que ajustar.", status: "Realizada", ata: "Aprovado o novo fluxo de capas. Rafael assume a revis\xE3o dos gabaritos." }
-      ];
-      this.announcements = [
-        { id: "a1", titulo: "Bienal do Livro \u2014 escala da equipe", mensagem: "A escala do estande j\xE1 est\xE1 fechada. Quem for para S\xE3o Paulo, retire o crach\xE1 com a Juliana at\xE9 quinta-feira.", autor: "Juliana Prado", data: iso(-1), prioridade: "Alta" },
-        { id: "a2", titulo: "Fechamento do cat\xE1logo do 2\xBA semestre", mensagem: "Enviem as fichas t\xE9cnicas dos t\xEDtulos at\xE9 dia 20. Depois disso o cat\xE1logo vai para a gr\xE1fica.", autor: "Ana Beatriz Moraes", data: iso(-3), prioridade: "M\xE9dia" },
-        { id: "a3", titulo: "Caf\xE9 da manh\xE3 de aniversariantes", mensagem: "Sexta-feira, 9h30, na copa do 3\xBA andar. Quem estiver em home office pode participar pelo Meet.", autor: "Camila Ferraz", data: iso(-5), prioridade: "Baixa" }
-      ];
-    },
-    activate() {
-      if (this.active) return;
-      this.active = true;
-      this.seed();
-    }
-  };
-  var http = new HttpClient(CONFIG);
-  async function readOrDemo(realCall, demoCall) {
-    if (Demo.active) {
-      const result = await demoCall();
-      result.__demo = true;
-      return result;
-    }
-    try {
-      return await realCall();
+      try { json = JSON.parse(text); }
+      catch { throw new ApiError(FRIENDLY.parse, { code: "parse" }); }
+
+      if (!json.success) throw new ApiError(json.message || FRIENDLY.server, { code: "server" });
+      return json.data;
     } catch (error) {
-      if (CONFIG.demoFallback && ["network", "timeout", "parse", "server"].includes(error.code)) {
-        Demo.activate();
-        const result = await demoCall();
-        result.__demo = true;
-        return result;
+      const retriable = error.name === "AbortError" || error instanceof TypeError || error.code === "server";
+      if (retriable && attempt < CONFIG.retries) {
+        await new Promise((r) => setTimeout(r, CONFIG.retryDelay * (attempt + 1)));
+        return call(action, payload, attempt + 1);
       }
-      throw error;
+      if (error.name === "AbortError") throw new ApiError(FRIENDLY.timeout, { code: "timeout" });
+      if (error instanceof ApiError) throw error;
+      throw new ApiError(FRIENDLY.network, { code: "network" });
+    } finally {
+      clearTimeout(timer);
     }
   }
-  async function readOptional(realCall, demoCall, label) {
-    if (Demo.active) {
-      const result = await demoCall();
-      result.__demo = true;
-      return result;
-    }
-    try {
-      return await realCall();
-    } catch (error) {
-      return { items: [], __error: friendlyMessage(error), __label: label };
-    }
+
+  // ---- Colaboradores ----
+  async function loadEmployees() { return { items: (await call("employees.list")) || [] }; }
+  async function getEmployee(id) { return await call("employees.get", { id }); }
+  async function createEmployee(data) { return { data: await call("employees.create", data) }; }
+  async function updateEmployee(data) { return { data: await call("employees.update", data) }; }
+  async function deleteEmployee(id) { return { data: await call("employees.delete", { id }) }; }
+  async function updateStatus(id, status, extra = {}) {
+    return { data: await call("employees.status", { id, status, ...extra }) };
   }
-  async function mutate(realCall, demoCall) {
-    if (Demo.active) {
-      const result = await demoCall();
-      result.__demo = true;
-      return result;
-    }
-    return realCall();
+
+  // ---- Comunicados ----
+  async function loadAnnouncements() { return { items: (await call("announcements.list")) || [] }; }
+  async function createAnnouncement(data) { return { data: await call("announcements.create", data) }; }
+  async function updateAnnouncement(data) { return { data: await call("announcements.update", data) }; }
+  async function deleteAnnouncement(id) { return { data: await call("announcements.delete", { id }) }; }
+
+  // ---- Categorias ----
+  async function loadCategories() {
+    const items = (await call("categories.list")) || [];
+    return { items };
   }
+  async function createCategory(data) { return { data: await call("categories.create", data) }; }
+  async function updateCategory(data) { return { data: await call("categories.update", data) }; }
+  async function deleteCategory(id) { return { data: await call("categories.delete", { id }) }; }
+
+  // ---- Atalhos ----
+  async function loadLinks() { return { items: (await call("links.list")) || [] }; }
+  async function createLink(data) { return { data: await call("links.create", data) }; }
+  async function updateLink(data) { return { data: await call("links.update", data) }; }
+  async function deleteLink(id) { return { data: await call("links.delete", { id }) }; }
+
+  // ---- Reuniões ----
+  async function loadMeetings() { return { items: (await call("meetings.list")) || [] }; }
+  async function createMeeting(data) { return { data: await call("meetings.create", data) }; }
+  async function updateMeeting(data) { return { data: await call("meetings.update", data) }; }
+  async function deleteMeeting(id) { return { data: await call("meetings.delete", { id }) }; }
+
+  // ---- Importação em lote ----
+  async function importEmployees(list) {
+    for (const item of list) await call("employees.create", item);
+    return { success: true, count: list.length };
+  }
+
+  // ---- Diagnóstico ----
   async function diagnose() {
-    const report = { endpoint: CONFIG.endpoint, demo: Demo.active, steps: [] };
-    for (const action of ["ping", "list", "announcements", "links"]) {
+    const report = { endpoint: CONFIG.endpoint, demo: false, steps: [] };
+    for (const action of ["ping", "employees.list", "announcements.list", "meetings.list"]) {
       try {
-        const raw = await http.raw({ action });
-        const isJson = raw.text.trim().startsWith("{") || raw.text.trim().startsWith("[");
-        const isLogin = /accounts\.google\.com|Fa\u00e7a login|Sign in/i.test(raw.text);
+        const data = await call(action);
         report.steps.push({
-          action,
-          status: raw.status,
-          contentType: raw.contentType,
-          ok: raw.status === 200 && isJson,
-          diagnosis: isLogin ? 'O Apps Script pediu login \u2014 a implanta\xE7\xE3o N\xC3O est\xE1 como "Qualquer pessoa".' : !isJson ? "Veio HTML em vez de JSON \u2014 a implanta\xE7\xE3o est\xE1 desatualizada ou com erro." : "Resposta JSON v\xE1lida.",
-          preview: raw.text.slice(0, 320)
+          action, status: 200, contentType: "application/json", ok: true,
+          diagnosis: "Resposta válida.",
+          preview: JSON.stringify(Array.isArray(data) ? { registros: data.length } : data).slice(0, 260)
         });
       } catch (error) {
         report.steps.push({
-          action,
-          status: 0,
-          contentType: "\u2014",
-          ok: false,
-          diagnosis: "A requisi\xE7\xE3o nem completou (rede, CORS ou URL inv\xE1lida).",
+          action, status: error.code === "auth" ? 401 : 0, contentType: "—", ok: false,
+          diagnosis: error.code === "auth"
+            ? "Token de administrador ausente ou incorreto (só afeta escrita)."
+            : friendlyMessage(error),
           preview: String(error.message || error)
         });
       }
     }
     return report;
   }
-  async function loadEmployees() {
-    const result = await readOrDemo(
-      async () => {
-        const response = await http.get({ action: "list" });
-        return { items: extractList(response).map(EmployeeMapper.toModel) };
-      },
-      async () => ({ items: Demo.employees.map(EmployeeMapper.toModel) })
-    );
-    return result;
-  }
-  async function createEmployee(data) {
-    const payload = EmployeeMapper.toPayload({ ...data, atualizadoEm: (/* @__PURE__ */ new Date()).toISOString() });
-    return mutate(
-      () => http.postRecord("create", payload),
-      async () => {
-        const created = { ...data, id: uid("emp") };
-        Demo.employees.unshift(created);
-        return { success: true, data: created };
-      }
-    );
-  }
-  async function updateEmployee(data) {
-    const payload = EmployeeMapper.toPayload({ ...data, atualizadoEm: (/* @__PURE__ */ new Date()).toISOString() });
-    return mutate(
-      () => http.postRecord("update", payload),
-      async () => {
-        const index = Demo.employees.findIndex((e) => String(e.id) === String(data.id));
-        if (index >= 0) Demo.employees[index] = { ...Demo.employees[index], ...data };
-        return { success: true };
-      }
-    );
-  }
-  async function deleteEmployee(id) {
-    return mutate(
-      () => http.post("delete", { id }),
-      async () => {
-        Demo.employees = Demo.employees.filter((e) => String(e.id) !== String(id));
-        return { success: true };
-      }
-    );
-  }
-  async function updateStatus(id, status, extra = {}) {
-    const payload = { id, status, ...extra, atualizadoEm: (/* @__PURE__ */ new Date()).toISOString() };
-    return mutate(
-      () => http.post("status", payload),
-      async () => {
-        const index = Demo.employees.findIndex((e) => String(e.id) === String(id));
-        if (index >= 0) Demo.employees[index] = { ...Demo.employees[index], ...payload };
-        return { success: true };
-      }
-    );
-  }
-  async function loadAnnouncements() {
-    return readOptional(
-      async () => {
-        const response = await http.get({ action: "announcements" });
-        return { items: extractList(response).map(AnnouncementMapper.toModel) };
-      },
-      async () => ({ items: Demo.announcements.map(AnnouncementMapper.toModel) }),
-      "Comunicados"
-    );
-  }
-  async function createAnnouncement(data) {
-    const payload = AnnouncementMapper.toPayload({ ...data, data: data.data || (/* @__PURE__ */ new Date()).toISOString() });
-    return mutate(
-      () => http.postRecord("createAnnouncement", payload),
-      async () => {
-        const created = { ...payload, id: uid("com") };
-        Demo.announcements.unshift(created);
-        return { success: true, data: created };
-      }
-    );
-  }
-  async function updateAnnouncement(data) {
-    const payload = AnnouncementMapper.toPayload(data);
-    return mutate(
-      () => http.postRecord("updateAnnouncement", payload),
-      async () => {
-        const index = Demo.announcements.findIndex((a) => String(a.id) === String(data.id));
-        if (index >= 0) Demo.announcements[index] = { ...Demo.announcements[index], ...payload };
-        return { success: true };
-      }
-    );
-  }
-  async function deleteAnnouncement(id) {
-    return mutate(
-      () => http.post("deleteAnnouncement", { id }),
-      async () => {
-        Demo.announcements = Demo.announcements.filter((a) => String(a.id) !== String(id));
-        return { success: true };
-      }
-    );
-  }
-  async function loadCategories() {
-    return readOptional(
-      async () => {
-        const response = await http.get({ action: "categories" });
-        const items = extractList(response).map(CategoryMapper.toModel).filter((item) => item.nome);
-        return { items: items.length ? items : DEFAULT_CATEGORIES };
-      },
-      async () => ({ items: Demo.categories }),
-      "Categorias"
-    );
-  }
-  async function createCategory(data) {
-    const payload = CategoryMapper.toPayload(data);
-    return mutate(
-      () => http.postRecord("createCategory", payload),
-      async () => {
-        const created = { ...payload, id: uid("cat") };
-        Demo.categories.push(created);
-        return { success: true, data: created };
-      }
-    );
-  }
-  async function updateCategory(data) {
-    const payload = CategoryMapper.toPayload(data);
-    return mutate(
-      () => http.postRecord("updateCategory", payload),
-      async () => {
-        const index = Demo.categories.findIndex((item) => String(item.id) === String(data.id));
-        if (index >= 0) Demo.categories[index] = { ...Demo.categories[index], ...payload };
-        return { success: true };
-      }
-    );
-  }
-  async function deleteCategory(id) {
-    return mutate(
-      () => http.post("deleteCategory", { id }),
-      async () => {
-        Demo.categories = Demo.categories.filter((item) => String(item.id) !== String(id));
-        return { success: true };
-      }
-    );
-  }
-  async function loadLinks() {
-    return readOptional(
-      async () => {
-        const response = await http.get({ action: "links" });
-        return { items: extractList(response).map(LinkMapper.toModel) };
-      },
-      async () => ({ items: Demo.links.map(LinkMapper.toModel) }),
-      "Atalhos"
-    );
-  }
-  async function createLink(data) {
-    const payload = LinkMapper.toPayload(data);
-    return mutate(
-      () => http.postRecord("createLink", payload),
-      async () => {
-        const created = { ...payload, id: uid("lnk") };
-        Demo.links.unshift(created);
-        return { success: true, data: created };
-      }
-    );
-  }
-  async function updateLink(data) {
-    const payload = LinkMapper.toPayload(data);
-    return mutate(
-      () => http.postRecord("updateLink", payload),
-      async () => {
-        const index = Demo.links.findIndex((link) => String(link.id) === String(data.id));
-        if (index >= 0) Demo.links[index] = { ...Demo.links[index], ...payload };
-        return { success: true };
-      }
-    );
-  }
-  async function deleteLink(id) {
-    return mutate(
-      () => http.post("deleteLink", { id }),
-      async () => {
-        Demo.links = Demo.links.filter((link) => String(link.id) !== String(id));
-        return { success: true };
-      }
-    );
-  }
-  async function loadMeetings() {
-    return readOptional(
-      async () => {
-        const response = await http.get({ action: "meetings" });
-        return { items: extractList(response).map(MeetingMapper.toModel) };
-      },
-      async () => ({ items: Demo.meetings.map(MeetingMapper.toModel) }),
-      "Reuni\xF5es"
-    );
-  }
-  async function createMeeting(data) {
-    const payload = MeetingMapper.toPayload(data);
-    return mutate(
-      () => http.postRecord("createMeeting", payload),
-      async () => {
-        const created = { ...payload, id: uid("reu") };
-        Demo.meetings.unshift(created);
-        return { success: true, data: created };
-      }
-    );
-  }
-  async function updateMeeting(data) {
-    const payload = MeetingMapper.toPayload(data);
-    return mutate(
-      () => http.postRecord("updateMeeting", payload),
-      async () => {
-        const index = Demo.meetings.findIndex((m) => String(m.id) === String(data.id));
-        if (index >= 0) Demo.meetings[index] = { ...Demo.meetings[index], ...payload };
-        return { success: true };
-      }
-    );
-  }
-  async function deleteMeeting(id) {
-    return mutate(
-      () => http.post("deleteMeeting", { id }),
-      async () => {
-        Demo.meetings = Demo.meetings.filter((m) => String(m.id) !== String(id));
-        return { success: true };
-      }
-    );
-  }
-  async function importEmployees(list) {
-    const results = [];
-    for (const item of list) {
-      results.push(await createEmployee(item));
+
+  // Modo demonstração desativado — agora há um backend real.
+  var isDemoMode = () => false;
+
+  // Compatibilidade: importação de Excel ainda usa EmployeeMapper.toModel.
+  var EmployeeMapper = {
+    toModel(row = {}) {
+      const g = (...keys) => {
+        for (const k of keys) {
+          const f = Object.keys(row).find((rk) => rk.trim().toLowerCase() === k.toLowerCase());
+          if (f && row[f] != null && row[f] !== "") return row[f];
+        }
+        return "";
+      };
+      return {
+        id: String(g("id","ID","codigo") || "emp_" + Date.now() + Math.random().toString(36).slice(2,6)),
+        nome: String(g("nome","name","colaborador")),
+        cargo: String(g("cargo","role","funcao","função")),
+        departamento: String(g("departamento","department","setor","area","área")),
+        equipe: String(g("equipe","team","time")),
+        gestor: String(g("gestor","manager","lider","líder")),
+        telefone: String(g("telefone","phone","celular","ramal")),
+        email: String(g("email","e-mail","mail")),
+        foto: String(g("foto","photo","avatar","imagem")),
+        status: String(g("status","situacao","situação") || "Presencial"),
+        dataSaida: String(g("dataSaida","data_saida","saida","início","inicio")),
+        dataRetorno: String(g("dataRetorno","data_retorno","retorno","fim")),
+        responsavel: String(g("responsavel","responsável","substituto","backup")),
+        motivo: String(g("motivo","reason")),
+        dataAdmissao: String(g("dataAdmissao","admissao","admissão")),
+        aniversario: String(g("aniversario","aniversário","nascimento","birthday")),
+        observacoes: String(g("observacoes","observações","obs","notes")),
+        historico: []
+      };
     }
-    return { success: true, count: results.length };
-  }
-  var isDemoMode = () => Demo.active;
+  };
+
+
 
   // js/ui.js
   var PATHS = {
@@ -8919,6 +8450,7 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
   }
   document.addEventListener("DOMContentLoaded", init);
 })();
+
 
 </script>
 </body>
