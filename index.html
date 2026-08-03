@@ -5816,7 +5816,17 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
   }
 
   // ---- Colaboradores ----
-  async function loadEmployees() { return { items: (await call("employees.list")) || [] }; }
+  async function loadEmployees() {
+    const items = ((await call("employees.list")) || []).map((e) => {
+      let historico = e.historico;
+      if (typeof historico === "string") {
+        try { historico = JSON.parse(historico); } catch { historico = []; }
+      }
+      if (!Array.isArray(historico)) historico = [];
+      return { ...e, historico };
+    });
+    return { items };
+  }
   async function getEmployee(id) { return await call("employees.get", { id }); }
   async function createEmployee(data) { return { data: await call("employees.create", data) }; }
   async function updateEmployee(data) { return { data: await call("employees.update", data) }; }
@@ -5826,7 +5836,15 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
   }
 
   // ---- Comunicados ----
-  async function loadAnnouncements() { return { items: (await call("announcements.list")) || [] }; }
+  async function loadAnnouncements() {
+    const items = ((await call("announcements.list")) || []).map((a) => ({
+      ...a,
+      areas: Array.isArray(a.areas)
+        ? a.areas
+        : String(a.areas || "").split(/[,;|]/).map((s) => s.trim()).filter(Boolean)
+    }));
+    return { items };
+  }
   async function createAnnouncement(data) { return { data: await call("announcements.create", data) }; }
   async function updateAnnouncement(data) { return { data: await call("announcements.update", data) }; }
   async function deleteAnnouncement(id) { return { data: await call("announcements.delete", { id }) }; }
