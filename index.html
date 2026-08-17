@@ -2560,6 +2560,35 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
 
         <div class="auth__foot">
           <button type="button" data-pane-go="recover">Esqueci minha senha</button>
+          <button type="button" data-pane-go="signup">Criar minha conta</button>
+        </div>
+      </form>
+
+      <!-- Auto-cadastro: fica pendente até um administrador aprovar -->
+      <form class="auth__pane" data-pane="signup" novalidate>
+        <h1>Criar minha conta</h1>
+        <p>Use seu e-mail da editora. Um administrador libera o acesso depois.</p>
+
+        <div class="field">
+          <label class="field__label" for="signupNome">Nome completo</label>
+          <input id="signupNome" type="text" autocomplete="name" placeholder="Ex.: Ana Beatriz Moraes" required>
+        </div>
+        <div class="field">
+          <label class="field__label" for="signupEmail">E-mail da editora</label>
+          <input id="signupEmail" type="email" autocomplete="username" placeholder="nome@editorainspire.com.br" required>
+        </div>
+        <div class="field">
+          <label class="field__label" for="signupSenha">Senha</label>
+          <input id="signupSenha" type="password" autocomplete="new-password" placeholder="Mínimo de 8 caracteres" required>
+          <div class="pw-meter" id="signupMeter" data-level="0"><span></span><span></span><span></span><span></span></div>
+        </div>
+
+        <div class="auth__msg" id="signupMsg"></div>
+
+        <button class="btn btn--primary btn--block" id="signupSubmit" type="submit">Enviar cadastro</button>
+
+        <div class="auth__foot">
+          <button type="button" data-pane-go="login">Já tenho conta</button>
         </div>
       </form>
 
@@ -2606,7 +2635,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
         </div>
       </form>
 
-      <p class="auth__hint" style="margin-top:20px">Sem conta? Peça à administração da Editora Inspire.</p>
+      <p class="auth__hint" style="margin-top:20px">Problemas para entrar? Fale com a administração da Editora Inspire.</p>
     </div>
   </div>
 
@@ -3727,6 +3756,21 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
       return this.guardar(dados);
     },
 
+    /**
+     * Auto-cadastro. A conta nasce pendente: o gatilho no banco marca
+     * ativo = false até um administrador aprovar.
+     */
+    async cadastrar(nome, email, senha) {
+      const destino = `${location.origin}${location.pathname}`;
+      return this.pedir(`/signup?redirect_to=${encodeURIComponent(destino)}`, {
+        body: {
+          email: String(email).trim().toLowerCase(),
+          password: senha,
+          data: { nome: String(nome).trim() }
+        }
+      });
+    },
+
     async renovar() {
       if (!this.sessao?.refresh_token) return null;
       // Uma renovação por vez: várias chamadas simultâneas dividem a mesma promessa.
@@ -3796,6 +3840,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
 
       if (erro) return { erro: decodeURIComponent(erro.replace(/\+/g, " ")) };
       if (tipo === "recovery" && token) return { token };
+      if (tipo === "signup") return { confirmado: true };
       return null;
     }
   };
@@ -3808,6 +3853,12 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     if (status === 422 && bruto.includes("password")) return "A senha precisa de pelo menos 8 caracteres.";
     if (status === 429) return "Muitas tentativas seguidas. Espere alguns minutos e tente de novo.";
     if (bruto.includes("same as the old")) return "A nova senha precisa ser diferente da anterior.";
+    if (bruto.includes("apenas com e-mail") || bruto.includes("check_violation")) {
+      return "O cadastro só aceita e-mail @editorainspire.com.br.";
+    }
+    if (status === 422 && bruto.includes("already registered")) {
+      return "Já existe uma conta com esse e-mail. Use \"Esqueci minha senha\".";
+    }
     if (bruto.includes("expired") || bruto.includes("invalid")) return "Este link expirou. Peça um novo por e-mail.";
     return dados?.error_description || dados?.msg || dados?.message || "Não foi possível concluir. Tente de novo.";
   }
@@ -3841,7 +3892,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
   }
 
   /** Disparado quando o servidor recusa a sessão: o app volta para o login. */
-  let aoPerderSessao = () => {};
+  let aoPerderSessao = (_mensagem) => {};
 
   async function call(action, payload = {}, tentativa = 0, jaRenovou = false) {
     if (!navigator.onLine) throw new ApiError(FRIENDLY.offline, { code: "offline" });
@@ -3862,17 +3913,29 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
         body: JSON.stringify({ action, payload })
       });
 
+      // 401 e 403 vêm com mensagem própria do servidor — "aguardando
+      // aprovação" e "sessão expirada" precisam chegar diferentes à tela.
+      const mensagemDoServidor = async () => {
+        try {
+          const corpo = await resposta.clone().json();
+          return corpo?.message || "";
+        } catch { return ""; }
+      };
+
       if (resposta.status === 401) {
-        // Uma tentativa de renovar antes de mandar a pessoa para o login.
         if (!jaRenovou && Auth.sessao?.refresh_token) {
           const nova = await Auth.renovar();
           if (nova) return call(action, payload, tentativa, true);
         }
+        const msg = await mensagemDoServidor();
         Auth.limpar();
-        aoPerderSessao();
-        throw new ApiError(FRIENDLY.auth, { code: "auth" });
+        aoPerderSessao(msg || FRIENDLY.auth);
+        throw new ApiError(msg || FRIENDLY.auth, { code: "auth" });
       }
-      if (resposta.status === 403) throw new ApiError(FRIENDLY.forbidden, { code: "forbidden" });
+      if (resposta.status === 403) {
+        const msg = await mensagemDoServidor();
+        throw new ApiError(msg || FRIENDLY.forbidden, { code: "forbidden" });
+      }
       if (!resposta.ok && resposta.status >= 500) throw new ApiError("HTTP " + resposta.status, { code: "server" });
 
       const texto = await resposta.text();
@@ -3952,6 +4015,9 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
   const updateUser = (data) => call("users.update", data);
   const resetUserPassword = (id, senha) => call("users.password", { id, senha });
   const deleteUser = (id) => call("users.delete", { id });
+  const approveUser = (id, papel, colaborador_id) =>
+    call("users.approve", { id, papel, colaborador_id: colaborador_id || null });
+  const rejectUser = (id) => call("users.reject", { id });
   const loadMyProfile = () => call("users.me");
   const changeMyPassword = (senhaAtual, novaSenha) => call("users.changePassword", { senhaAtual, novaSenha });
 
@@ -4378,9 +4444,46 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     };
     const [pCor, pSoft, pNome] = PAPEL_BADGE[conta.papel] || PAPEL_BADGE.leitor;
     const papelBadge = `<span class="badge" style="--status-color:${pCor};--status-soft:${pSoft}"><span class="badge__dot"></span>${pNome}</span>`;
-    const situacao = conta.ativo
-      ? `<span class="badge" style="--status-color:var(--success);--status-soft:var(--success-soft)"><span class="badge__dot"></span>Ativa</span>`
-      : `<span class="badge" style="--status-color:var(--danger);--status-soft:var(--danger-soft)"><span class="badge__dot"></span>Bloqueada</span>`;
+    const pendente = conta.pendente || conta.aprovado_em === null;
+    const situacao = pendente
+      ? `<span class="badge" style="--status-color:var(--warning);--status-soft:var(--warning-soft)"><span class="badge__dot"></span>Aguardando aprovação</span>`
+      : conta.ativo
+        ? `<span class="badge" style="--status-color:var(--success);--status-soft:var(--success-soft)"><span class="badge__dot"></span>Ativa</span>`
+        : `<span class="badge" style="--status-color:var(--danger);--status-soft:var(--danger-soft)"><span class="badge__dot"></span>Bloqueada</span>`;
+
+    // Cadastro pendente não tem papel ainda: quem aprova é que escolhe.
+    if (pendente) {
+      return `
+      <tr data-id="${escapeHtml(conta.id)}" style="background:var(--warning-soft)">
+        <td>
+          <div class="td-person">
+            <div class="avatar avatar--xs" style="--status-color:var(--warning)">${initials(conta.nome || conta.email)}</div>
+            <div>
+              <strong>${escapeHtml(conta.nome || "Sem nome")}</strong>
+              <span>${escapeHtml(conta.email)}</span>
+            </div>
+          </div>
+        </td>
+        <td><span class="muted" style="font-size:12px">a definir</span></td>
+        <td>${situacao}</td>
+        <td>
+          <span style="font-size:12px">Pediu ${escapeHtml(timeAgo(conta.criado_em).toLowerCase())}</span>
+          ${conta.emailConfirmado === false
+            ? '<br><span style="font-size:11px;color:var(--danger)">e-mail não confirmado</span>'
+            : ""}
+        </td>
+        <td>
+          <div class="td-actions">
+            <button class="btn btn--primary btn--sm" data-action="approve-user" data-id="${escapeHtml(conta.id)}">
+              ${icon("check", 14)} Aprovar
+            </button>
+            <button class="btn btn--ghost btn--sm" data-action="reject-user" data-id="${escapeHtml(conta.id)}" title="Recusar e apagar o cadastro">
+              ${icon("ban", 14)}
+            </button>
+          </div>
+        </td>
+      </tr>`;
+    }
 
     return `
     <tr data-id="${escapeHtml(conta.id)}">
@@ -5955,6 +6058,9 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
 
   const PAPEL_LABEL = { admin: "Administrador", editor: "Editor", leitor: "Leitor" };
 
+  // A trava de verdade está no banco; aqui é só para avisar antes de enviar.
+  const DOMINIO_PERMITIDO = "@editorainspire.com.br";
+
   const VIEW_TITLES = {
     dashboard:  ["Visão geral", "Quem está disponível para a equipe agora"],
     equipe:     ["Equipe", "Todos os colaboradores cadastrados"],
@@ -6064,6 +6170,46 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
       }
     });
 
+    document.querySelector('[data-pane="signup"]').addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const botao = el("signupSubmit");
+      const nome = el("signupNome").value.trim();
+      const email = el("signupEmail").value.trim().toLowerCase();
+      const senha = el("signupSenha").value;
+
+      if (nome.split(/\s+/).filter(Boolean).length < 2) {
+        aviso("signupMsg", "Informe seu nome e sobrenome."); return;
+      }
+      if (!email.endsWith(DOMINIO_PERMITIDO)) {
+        aviso("signupMsg", `O cadastro só aceita e-mail terminado em ${DOMINIO_PERMITIDO}.`); return;
+      }
+      if (senha.length < 8) {
+        aviso("signupMsg", "A senha precisa de pelo menos 8 caracteres."); return;
+      }
+
+      aviso("signupMsg", "");
+      ocupar(botao, true);
+      try {
+        const resposta = await Auth.cadastrar(nome, email, senha);
+        el("signupSenha").value = "";
+        // Com confirmação de e-mail ligada, o Supabase não devolve sessão.
+        const precisaConfirmar = !resposta?.access_token;
+        mostrarPainel("login");
+        aviso("loginMsg", precisaConfirmar
+          ? "Cadastro enviado. Confirme seu e-mail pelo link que acabamos de mandar e aguarde a liberação de um administrador."
+          : "Cadastro enviado. Um administrador precisa liberar seu acesso — você será avisado.", "ok");
+      } catch (error) {
+        aviso("signupMsg", error.message);
+      } finally {
+        ocupar(botao, false, "Enviar cadastro");
+      }
+    });
+
+    const campoSignup = el("signupSenha");
+    campoSignup?.addEventListener("input", () => {
+      el("signupMeter").dataset.level = String(passwordStrength(campoSignup.value));
+    });
+
     const campoReset = el("resetSenha");
     campoReset?.addEventListener("input", () => {
       el("resetMeter").dataset.level = String(passwordStrength(campoReset.value));
@@ -6087,6 +6233,8 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     try {
       state.perfil = await loadMyProfile();
     } catch (error) {
+      // Conta pendente ou bloqueada chega aqui: a mensagem do servidor já
+      // explica o caso, então vai direto para a tela de acesso.
       Auth.limpar();
       mostrarAuth("login");
       aviso("loginMsg", friendlyMessage(error));
@@ -6230,7 +6378,11 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     document.getElementById("navCountNotices").textContent = splitNotices(state.announcements).active.length;
     document.getElementById("navCountLinks").textContent = state.links.length;
     document.getElementById("navCountMeetings").textContent = upcomingMeetings(state.meetings).length;
-    document.getElementById("navCountUsers").textContent = state.users.length || "—";
+    const pendentes = state.users.filter((c) => c.pendente).length;
+    const contaUsers = document.getElementById("navCountUsers");
+    contaUsers.textContent = pendentes ? `${pendentes} novo${pendentes === 1 ? "" : "s"}` : (state.users.length || "—");
+    contaUsers.style.background = pendentes ? "var(--warning)" : "";
+    contaUsers.style.color = pendentes ? "#3D2F10" : "";
 
     document.getElementById("kpis").innerHTML = renderKPIs(state.employees, state.kpiFilter);
     document.getElementById("chips").innerHTML = renderChips(state.employees, state.statusFilter);
@@ -6283,15 +6435,30 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
       return;
     }
     body.innerHTML = state.users.map((conta) => userRow(conta, state.perfil?.id)).join("");
+
+    const pendentes = state.users.filter((c) => c.pendente).length;
+    const cabecalho = document.querySelector("#view-usuarios .table-wrap__head p");
+    if (cabecalho) {
+      cabecalho.textContent = pendentes
+        ? `${pendentes} cadastro${pendentes === 1 ? "" : "s"} esperando sua aprovação — aparece${pendentes === 1 ? "" : "m"} no topo da lista.`
+        : "Desativar bloqueia o login sem apagar o histórico da pessoa.";
+    }
   }
 
-  async function carregarUsuarios(silent = false) {
+  async function carregarUsuarios(silent = true) {
     if (!state.isAdmin) return;
     try {
       const { items } = await loadUsers();
       state.users = items || [];
-      document.getElementById("navCountUsers").textContent = state.users.length;
+      const pendentes = state.users.filter((c) => c.pendente).length;
+      const contaUsers = document.getElementById("navCountUsers");
+      contaUsers.textContent = pendentes ? `${pendentes} novo${pendentes === 1 ? "" : "s"}` : state.users.length;
+      contaUsers.style.background = pendentes ? "var(--warning)" : "";
+      contaUsers.style.color = pendentes ? "#3D2F10" : "";
       renderUserTable();
+      if (pendentes && !silent) {
+        Toast.info(`${pendentes} cadastro${pendentes === 1 ? "" : "s"} esperando aprovação.`);
+      }
     } catch (error) {
       if (!silent) Toast.error(friendlyMessage(error));
     }
@@ -6960,6 +7127,100 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     });
   }
 
+  /** Aprovar é onde a permissão é decidida — por isso pede confirmação. */
+  function openApproveUser(conta) {
+    const vinculos = state.employees
+      .map((person) => {
+        const sugerido = String(person.email || "").toLowerCase() === String(conta.email || "").toLowerCase();
+        return `<option value="${escapeHtml(person.id)}" ${sugerido ? "selected" : ""}>${escapeHtml(person.nome)}</option>`;
+      }).join("");
+
+    const temFicha = state.employees.some(
+      (person) => String(person.email || "").toLowerCase() === String(conta.email || "").toLowerCase()
+    );
+
+    Modal.open({
+      title: "Aprovar acesso",
+      subtitle: conta.email,
+      size: "sm",
+      body: `
+      <div class="reader" style="margin-bottom:20px;border-style:solid">
+        <div class="avatar avatar--xs" style="--status-color:var(--warning)">${initials(conta.nome || conta.email)}</div>
+        <div class="reader__body">
+          <div class="reader__name">${escapeHtml(conta.nome || "Sem nome")}</div>
+          <div class="reader__meta">Cadastrou-se ${escapeHtml(timeAgo(conta.criado_em).toLowerCase())}</div>
+        </div>
+      </div>
+
+      ${conta.emailConfirmado === false ? `
+      <div class="serie-note" style="background:var(--danger-soft);border-left-color:var(--danger);margin-bottom:18px">
+        ${icon("alert", 15)}
+        <span>Esta pessoa ainda não clicou no link de confirmação enviado por e-mail.
+        Aprovar agora funciona, mas você não tem prova de que o endereço é dela.</span>
+      </div>` : ""}
+
+      <form class="form-grid" id="approveForm" novalidate>
+        <div class="field span-2">
+          <label class="field__label" for="a-papel">Permissão</label>
+          <select id="a-papel" name="papel">
+            <option value="leitor" selected>Leitor — só visualiza</option>
+            <option value="editor">Editor — edita os dados</option>
+            <option value="admin">Administrador — edita tudo e gerencia contas</option>
+          </select>
+        </div>
+        <div class="field span-2">
+          <label class="field__label" for="a-colab">Ficha na equipe</label>
+          <select id="a-colab" name="colaborador_id">
+            <option value="" ${temFicha ? "" : "selected"}>Sem vínculo</option>
+            ${vinculos}
+          </select>
+          ${temFicha ? '<span class="field__hint">Encontramos uma ficha com o mesmo e-mail — já deixamos selecionada.</span>' : ""}
+        </div>
+      </form>`,
+      footer: `
+      <button class="btn btn--ghost" data-close>Cancelar</button>
+      <span class="spacer"></span>
+      <button class="btn btn--primary" id="confirmApprove">${icon("check", 15)} Liberar acesso</button>`,
+      onMount: (container) => {
+        container.querySelector("#confirmApprove").addEventListener("click", async (event) => {
+          const papel = container.querySelector("#a-papel").value;
+          const ficha = container.querySelector("#a-colab").value;
+          const button = event.currentTarget;
+          button.disabled = true;
+          button.innerHTML = '<span class="spinner"></span> Liberando…';
+          try {
+            await approveUser(conta.id, papel, ficha);
+            Modal.close();
+            Toast.success(`${firstName(conta.nome) || conta.email} já pode entrar como ${PAPEL_LABEL[papel].toLowerCase()}.`);
+            await carregarUsuarios(true);
+          } catch (error) {
+            Toast.error(friendlyMessage(error));
+            button.disabled = false;
+            button.innerHTML = `${icon("check", 15)} Liberar acesso`;
+          }
+        });
+      }
+    });
+  }
+
+  async function rejectUserAccount(id) {
+    const conta = state.users.find((item) => String(item.id) === String(id));
+    if (!conta) return;
+    const ok = await Modal.confirm({
+      title: "Recusar cadastro",
+      text: `O cadastro de <strong>${escapeHtml(conta.email)}</strong> será apagado. A pessoa pode se cadastrar de novo depois.`,
+      confirmLabel: "Recusar"
+    });
+    if (!ok) return;
+    try {
+      await rejectUser(id);
+      Toast.success("Cadastro recusado.");
+      await carregarUsuarios(true);
+    } catch (error) {
+      Toast.error(friendlyMessage(error));
+    }
+  }
+
   async function removeUser(id) {
     const conta = state.users.find((item) => String(item.id) === String(id));
     if (!conta) return;
@@ -7275,6 +7536,12 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
         case "edit-user": if (conta()) openUserForm(conta()); break;
         case "reset-user": if (conta()) openResetUser(conta()); break;
         case "delete-user": await removeUser(id); break;
+        case "approve-user": {
+          const alvo = conta();
+          if (alvo) openApproveUser(alvo);
+          break;
+        }
+        case "reject-user": await rejectUserAccount(id); break;
         case "refresh-users": await carregarUsuarios(); Toast.success("Contas atualizadas."); break;
 
         case "import": document.getElementById("importInput").click(); break;
@@ -7320,10 +7587,10 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     bindAuthScreen();
     bindEvents();
 
-    aoPerderSessao = () => {
+    aoPerderSessao = (mensagem) => {
       pararPolling();
       mostrarAuth("login");
-      aviso("loginMsg", "Sua sessão expirou. Entre de novo.");
+      aviso("loginMsg", mensagem || "Sua sessão expirou. Entre de novo.");
     };
 
     document.getElementById("today").textContent = formatToday();
@@ -7337,6 +7604,13 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     if (link?.token) {
       state.tokenRecuperacao = link.token;
       mostrarAuth("reset");
+      return;
+    }
+    if (link?.confirmado) {
+      // Voltou do link de confirmação: o e-mail está provado, falta a aprovação.
+      Auth.limpar();
+      mostrarAuth("login");
+      aviso("loginMsg", "E-mail confirmado. Agora um administrador precisa liberar seu acesso.", "ok");
       return;
     }
 
