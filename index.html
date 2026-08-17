@@ -724,6 +724,20 @@ html[data-theme="dark"] .banner { color: var(--warning); }
 }
 
 /* Some para quem não é administrador. */
+/*
+ * As animações de entrada valem só para a primeira pintura. Sem isso, cada
+ * tecla digitada na busca reinicia a animação de todos os cartões e a tela
+ * pisca.
+ */
+body.is-painted .kpi,
+body.is-painted .emp,
+body.is-painted .notice,
+body.is-painted .shortcut,
+body.is-painted .meet,
+body.is-painted .party,
+body.is-painted .birthdays,
+body.is-painted .view.is-active { animation: none !important; }
+
 /* Some para quem não pode editar (leitor). */
 body:not(.can-edit) [data-edit-only] { display: none !important; }
 /* Some para quem não é administrador (leitor e editor). */
@@ -2272,6 +2286,71 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
   color: var(--primary);
 }
 
+/* ---------- Comunicado ainda não lido: conteúdo fechado ---------- */
+.notice--locked { cursor: pointer; border-style: dashed; }
+.notice--locked:hover { border-color: var(--status-color, var(--secondary)); }
+
+.notice__sealed {
+  position: relative;
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  padding: var(--sp-4);
+  overflow: hidden;
+  text-align: center;
+}
+.notice__sealed-icon {
+  width: 34px; height: 34px;
+  margin: 0 auto 10px;
+  border-radius: var(--r-md);
+  display: grid; place-items: center;
+  background: var(--card);
+  color: var(--status-color, var(--text-mute));
+}
+.notice__sealed p { font-size: 12.5px; color: var(--text-soft); line-height: 1.5; }
+.notice__sealed strong { color: var(--primary); }
+
+/* Prévia embaçada: dá para ver que existe texto, não para lê-lo. */
+.notice__blur {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-soft);
+  filter: blur(4px);
+  user-select: none;
+  pointer-events: none;
+  max-height: 44px;
+  overflow: hidden;
+  margin-bottom: 12px;
+  opacity: .75;
+}
+
+.reader-doc__msg {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text);
+  white-space: pre-wrap;
+  padding: var(--sp-4) 0;
+}
+.reader-doc__meta {
+  display: flex; flex-wrap: wrap; gap: var(--sp-3);
+  align-items: center;
+  font-size: 12px; color: var(--text-mute);
+  padding-bottom: var(--sp-4);
+  margin-bottom: var(--sp-4);
+  border-bottom: 1px solid var(--border);
+}
+.reader-doc__seal {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 11px var(--sp-3);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  font-size: 12px; line-height: 1.5; color: var(--text-soft);
+}
+.reader-doc__seal svg { width: 15px; height: 15px; flex: none; margin-top: 2px; color: var(--text-mute); }
+.reader-doc__progress {
+  font-size: 11px; font-weight: 600; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--text-mute);
+}
+
 /* ---------- Confirmação de leitura ---------- */
 .read {
   display: inline-flex;
@@ -3095,7 +3174,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     </div>
   </div>
 
-  <button class="sync-fab" id="syncFab" aria-label="Sincronizar agora" title="Sincronizar agora" hidden>
+  <button class="sync-fab" id="syncFab" aria-label="Buscar dados atualizados" title="Buscar dados atualizados — o painel não atualiza sozinho" hidden>
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>
     <span class="sync-fab__label">Sincronizar</span>
   </button>
@@ -3866,7 +3945,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
   // ==========================================================================
   // Comunicação com a Edge Function
   // ==========================================================================
-  const CONFIG = { timeout: 15000, retries: 2, retryDelay: 800, pollInterval: 30000 };
+  const CONFIG = { timeout: 15000, retries: 2, retryDelay: 800 };
 
   class ApiError extends Error {
     constructor(message, { code = "unknown" } = {}) {
@@ -3984,7 +4063,6 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
   }
   const createAnnouncement = (data) => call("announcements.create", data);
   const markNoticeRead = (id) => call("announcements.read", { id });
-  const unmarkNoticeRead = (id) => call("announcements.unread", { id });
   const loadAudience = async () => ({ items: (await call("announcements.audience")) || [] });
   const updateAnnouncement = (data) => call("announcements.update", data);
   const deleteAnnouncement = (id) => call("announcements.delete", { id });
@@ -4141,7 +4219,8 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     key: '<circle cx="8" cy="15" r="4"/><path d="m10.8 12.2 8.2-8.2"/><path d="m17 6 2 2"/><path d="m14 9 2 2"/>',
     ban: '<circle cx="12" cy="12" r="9"/><path d="m5.6 5.6 12.8 12.8"/>',
     eyeCheck: '<path d="M2.5 12S6 5.5 12 5.5c1.4 0 2.7.35 3.8.9"/><circle cx="12" cy="12" r="2.6"/><path d="m16 18.5 2 2 4-4"/>',
-    repeat: '<path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>'
+    repeat: '<path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>',
+    envelope: '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 8 10 6 10-6"/><circle cx="19" cy="6" r="3" fill="currentColor" stroke="none"/>'
   };
 
   function icon(name, size = 20) {
@@ -4321,13 +4400,13 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     const meu = announcement.vistoPorMim;
     const minha = announcement.leituras?.find((l) => l.souEu);
 
+    // Confirmado é definitivo: virou um selo, não um botão.
     const proprio = meu
-      ? `<button class="read read--done" data-action="unmark-read" data-id="${escapeHtml(announcement.id)}"
-                 title="Clique para desfazer a confirmação">
+      ? `<span class="read read--done" title="Registro permanente${minha?.visto_em ? " · " + escapeHtml(formatDateTime(minha.visto_em)) : ""}">
            ${icon("check", 13)} Você leu${minha?.visto_em ? ` · ${escapeHtml(formatDateShort(minha.visto_em))}` : ""}
-         </button>`
-      : `<button class="read" data-action="mark-read" data-id="${escapeHtml(announcement.id)}">
-           ${icon("eyeCheck", 13)} Marcar como lida
+         </span>`
+      : `<button class="read" data-action="open-notice" data-id="${escapeHtml(announcement.id)}">
+           ${icon("eyeCheck", 13)} Ler e confirmar
          </button>`;
 
     const completo = total > 0 && lidas >= total;
@@ -4350,14 +4429,28 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
         ? `Ficou disponível de ${formatDate(announcement.data)} até ${formatDate(announcement.prazo)}`
         : `No mural até ${formatDate(announcement.prazo)}`)
       : "";
+    // Não lido fica selado: o texto só abre no leitor, que registra a hora.
+    const selado = !announcement.auto && !announcement.vistoPorMim;
+
+    const corpo = selado ? `
+      <div class="notice__blur" aria-hidden="true">${escapeHtml(announcement.mensagem.slice(0, 160))}</div>
+      <div class="notice__sealed">
+        <div class="notice__sealed-icon">${icon("envelope", 17)}</div>
+        <p>Você ainda não abriu este comunicado.<br>
+           <strong>Clique para ler</strong> — a hora fica registrada.</p>
+      </div>`
+      : `<p class="notice__msg">${escapeHtml(announcement.mensagem)}</p>`;
+
     return `
-    <article class="notice" style="--status-color:${meta.color};animation-delay:${Math.min(index * 50, 300)}ms${archived ? ";opacity:.72" : ""}">
+    <article class="notice ${selado ? "notice--locked" : ""}"
+             ${selado ? `data-action="open-notice" data-id="${escapeHtml(announcement.id)}"` : ""}
+             style="--status-color:${meta.color};animation-delay:${Math.min(index * 50, 300)}ms${archived ? ";opacity:.72" : ""}">
       <div class="notice__head">
         <h3 class="notice__title">${escapeHtml(announcement.titulo)}</h3>
         ${priorityBadge(announcement.prioridade)}
       </div>
       ${(announcement.areas || []).length ? `<div class="tags">${announcement.areas.map(areaTag).join("")}</div>` : ""}
-      <p class="notice__msg">${escapeHtml(announcement.mensagem)}</p>
+      ${corpo}
       <div class="notice__foot" style="gap:8px">
         ${readChips(announcement, total)}
       </div>
@@ -4667,16 +4760,18 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     open(config) {
       this.lastFocus = document.activeElement;
       const size = config.size ? `modal__panel--${config.size}` : "";
+      // Travado: sem X, sem Esc, sem clicar fora. Fecha só por um botão do rodapé.
+      const travado = Boolean(config.travado);
       modalRoot().innerHTML = `
       <div class="modal" role="dialog" aria-modal="true" aria-label="${escapeHtml(config.title)}">
-        <div class="modal__backdrop" data-close></div>
+        <div class="modal__backdrop" ${travado ? "" : "data-close"}></div>
         <div class="modal__panel ${size}">
           <header class="modal__head">
             <div>
               <h2>${escapeHtml(config.title)}</h2>
               ${config.subtitle ? `<p>${escapeHtml(config.subtitle)}</p>` : ""}
             </div>
-            <button class="modal__close" data-close aria-label="Fechar">${icon("x", 17)}</button>
+            ${travado ? "" : `<button class="modal__close" data-close aria-label="Fechar">${icon("x", 17)}</button>`}
           </header>
           <div class="modal__body">${config.body}</div>
           ${config.footer ? `<footer class="modal__foot">${config.footer}</footer>` : ""}
@@ -4688,7 +4783,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
       modalRoot().querySelectorAll("[data-close]").forEach((element) => {
         element.addEventListener("click", () => this.close());
       });
-      document.addEventListener("keydown", this.onKeydown);
+      if (!travado) document.addEventListener("keydown", this.onKeydown);
       document.body.style.overflow = "hidden";
 
       if (config.onMount) config.onMount(modalRoot());
@@ -5150,6 +5245,32 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     });
 
     sincronizar();
+  }
+
+  /** Corpo do leitor: o texto inteiro e o aviso de que a hora será gravada. */
+  function noticeReaderBody(announcement, jaLido) {
+    return `
+    <div class="reader-doc">
+      <div class="reader-doc__meta">
+        ${priorityBadge(announcement.prioridade)}
+        <span>${escapeHtml(announcement.autor || "Equipe Inspire")}</span>
+        <span class="dot"></span>
+        <span>${escapeHtml(timeAgo(announcement.data))}</span>
+        ${announcement.prazo ? `<span class="dot"></span><span>No mural até ${escapeHtml(formatDate(announcement.prazo))}</span>` : ""}
+      </div>
+
+      ${(announcement.areas || []).length
+        ? `<div class="tags" style="margin-bottom:14px">${announcement.areas.map(areaTag).join("")}</div>` : ""}
+
+      <div class="reader-doc__msg">${escapeHtml(announcement.mensagem)}</div>
+
+      <div class="reader-doc__seal">
+        ${icon(jaLido ? "check" : "lock", 15)}
+        <span>${jaLido
+          ? "Sua leitura já está registrada e não muda mais."
+          : "Ao confirmar, a data e a hora ficam registradas de forma permanente. Não é possível desfazer."}</span>
+      </div>
+    </div>`;
   }
 
   function readersBody(announcement, audiencia) {
@@ -6054,8 +6175,6 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     tokenRecuperacao: null
   };
 
-  let pollTimer = null;
-
   const PAPEL_LABEL = { admin: "Administrador", editor: "Editor", leitor: "Leitor" };
 
   // A trava de verdade está no banco; aqui é só para avisar antes de enviar.
@@ -6085,6 +6204,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     el("authScreen").hidden = false;
     document.body.classList.remove("is-admin", "can-edit");
     mostrarPainel(painel);
+    document.body.classList.remove("is-painted");
   }
   function aviso(id, texto, tipo = "erro") {
     const box = el(id);
@@ -6257,11 +6377,11 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     el("userRole").textContent = PAPEL_LABEL[state.perfil?.papel] || PAPEL_LABEL.leitor;
 
     await sync();
-    iniciarPolling();
+    mostrarPendentesDeLeitura();
   }
 
   async function sairDoApp() {
-    pararPolling();
+    filaJaMostrada = false;
     await Auth.sair();
     state.perfil = null;
     state.isAdmin = false;
@@ -6272,17 +6392,6 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     state.meetings = [];
     state.users = [];
     mostrarAuth("login");
-  }
-
-  function iniciarPolling() {
-    pararPolling();
-    pollTimer = setInterval(() => {
-      if (document.visibilityState === "visible" && navigator.onLine && Auth.sessao) sync(true);
-    }, CONFIG.pollInterval);
-  }
-  function pararPolling() {
-    if (pollTimer) clearInterval(pollTimer);
-    pollTimer = null;
   }
 
   // ---------- Sincronização ----------
@@ -6425,6 +6534,12 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     renderLinks(state.links, admin, state.linkFilter, state.search);
     renderAgenda(state.meetings, state.employees, admin);
     renderUserTable();
+
+    // A partir daqui as animações de entrada param, para o redesenho de cada
+    // filtro ou busca não fazer a tela piscar.
+    if (!state.loading) {
+      requestAnimationFrame(() => document.body.classList.add("is-painted"));
+    }
   }
 
   function renderUserTable() {
@@ -6677,36 +6792,101 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     }
   }
 
+  /** Grava a confirmação e reflete no estado local. Sem volta. */
+  async function confirmarLeitura(announcement) {
+    const resposta = await markNoticeRead(announcement.id);
+    announcement.leituras = [...(announcement.leituras || []), {
+      perfil_id: state.perfil.id,
+      nome: state.perfil.nome,
+      email: state.perfil.email,
+      visto_em: resposta?.visto_em || new Date().toISOString(),
+      souEu: true
+    }];
+    announcement.vistoPorMim = true;
+  }
+
   /**
-   * Confirma ou desfaz a leitura. Atualiza o estado local na hora e só depois
-   * sincroniza — o chip responde ao clique sem esperar a rede.
+   * Leitor de comunicados. Recebe uma fila: no login ela traz todos os não
+   * lidos, e ao clicar num cartão traz só aquele.
+   *
+   * "travado" vale para a fila do login — fechar exige clicar em "Ver depois",
+   * não escapa por Esc nem clicando fora.
    */
-  async function alternarLeitura(id, lida) {
-    const announcement = state.announcements.find((item) => String(item.id) === String(id));
+  function openNoticeReader(fila, indice = 0, { travado = false } = {}) {
+    const announcement = fila[indice];
     if (!announcement) return;
 
-    const antes = announcement.leituras || [];
-    announcement.leituras = lida
-      ? [...antes, {
-          perfil_id: state.perfil.id,
-          nome: state.perfil.nome,
-          email: state.perfil.email,
-          visto_em: new Date().toISOString(),
-          souEu: true
-        }]
-      : antes.filter((l) => String(l.perfil_id) !== String(state.perfil.id));
-    announcement.vistoPorMim = lida;
-    render();
+    const jaLido = Boolean(announcement.vistoPorMim);
+    const total = fila.length;
+    const ultimo = indice === total - 1;
 
-    try {
-      if (lida) await markNoticeRead(id);
-      else await unmarkNoticeRead(id);
-    } catch (error) {
-      announcement.leituras = antes;
-      announcement.vistoPorMim = !lida;
-      render();
-      Toast.error(friendlyMessage(error));
-    }
+    const avancar = () => {
+      if (ultimo) { Modal.close(); render(); return; }
+      Modal.close();
+      setTimeout(() => openNoticeReader(fila, indice + 1, { travado }), 280);
+    };
+
+    Modal.open({
+      title: announcement.titulo,
+      subtitle: total > 1 ? `Comunicado ${indice + 1} de ${total}` : "",
+      size: "lg",
+      travado,
+      body: noticeReaderBody(announcement, jaLido),
+      footer: jaLido
+        ? `<button class="btn btn--ghost btn--block" id="readerNext">${ultimo ? "Fechar" : "Próximo"}</button>`
+        : `
+        <button class="btn btn--ghost" id="readerLater">${travado ? "Ver depois" : "Fechar sem confirmar"}</button>
+        <span class="spacer"></span>
+        ${total > 1 ? `<span class="reader-doc__progress">${indice + 1}/${total}</span>` : ""}
+        <button class="btn btn--primary" id="readerConfirm">${icon("check", 15)} Li e confirmo</button>`,
+      onMount: (container) => {
+        container.querySelector("#readerNext")?.addEventListener("click", avancar);
+        container.querySelector("#readerLater")?.addEventListener("click", () => {
+          Modal.close();
+          render();
+        });
+
+        container.querySelector("#readerConfirm")?.addEventListener("click", async (event) => {
+          const button = event.currentTarget;
+          button.disabled = true;
+          button.innerHTML = '<span class="spinner"></span> Registrando…';
+          try {
+            await confirmarLeitura(announcement);
+            avancar();
+            if (ultimo) Toast.success("Leitura registrada.");
+          } catch (error) {
+            Toast.error(friendlyMessage(error));
+            button.disabled = false;
+            button.innerHTML = `${icon("check", 15)} Li e confirmo`;
+          }
+        });
+      }
+    });
+  }
+
+  function abrirComunicado(id) {
+    const announcement = state.announcements.find((item) => String(item.id) === String(id));
+    if (announcement) openNoticeReader([announcement], 0);
+  }
+
+  /**
+   * Fila do login: comunicados ativos que a pessoa ainda não abriu, com os de
+   * prioridade alta primeiro. Roda uma vez por sessão.
+   */
+  let filaJaMostrada = false;
+
+  function mostrarPendentesDeLeitura() {
+    if (filaJaMostrada || !state.perfil) return;
+    const ordem = { Alta: 0, "Média": 1, Baixa: 2 };
+    const fila = splitNotices(state.announcements).active
+      .filter((item) => !item.auto && !item.vistoPorMim)
+      .sort((a, b) =>
+        (ordem[a.prioridade] ?? 3) - (ordem[b.prioridade] ?? 3) ||
+        new Date(b.criado_em || b.data || 0) - new Date(a.criado_em || a.data || 0));
+
+    filaJaMostrada = true;
+    if (!fila.length) return;
+    setTimeout(() => openNoticeReader(fila, 0, { travado: true }), 700);
   }
 
   function openReaders(id) {
@@ -7516,8 +7696,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
         case "new-employee": openEmployeeForm(); break;
 
         case "new-notice": openNoticeForm(); break;
-        case "mark-read": await alternarLeitura(id, true); break;
-        case "unmark-read": await alternarLeitura(id, false); break;
+        case "open-notice": abrirComunicado(id); break;
         case "notice-readers": openReaders(id); break;
         case "edit-notice": openNoticeForm(state.announcements.find((item) => String(item.id) === String(id))); break;
         case "delete-notice": await removeNotice(id); break;
@@ -7572,11 +7751,12 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
       }
     });
 
+    // Sem atualização automática: o painel só busca dados quando você pede,
+    // ou quando a conexão volta. Antes havia um ciclo de 30s que redesenhava a
+    // tela inteira e fazia tudo piscar.
     window.addEventListener("online", () => { showOfflineBanner(false); sync(); });
-    window.addEventListener("offline", () => showOfflineBanner(true, "Você está sem conexão. Os dados podem estar desatualizados."));
-    document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "visible" && Auth.sessao) sync(true);
-    });
+    window.addEventListener("offline", () =>
+      showOfflineBanner(true, "Você está sem conexão. Os dados podem estar desatualizados."));
   }
 
   // ---------- Início ----------
@@ -7588,7 +7768,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     bindEvents();
 
     aoPerderSessao = (mensagem) => {
-      pararPolling();
+      filaJaMostrada = false;
       mostrarAuth("login");
       aviso("loginMsg", mensagem || "Sua sessão expirou. Entre de novo.");
     };
