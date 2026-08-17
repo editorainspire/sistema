@@ -2272,6 +2272,91 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
   color: var(--primary);
 }
 
+/* ---------- Confirmação de leitura ---------- */
+.read {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: var(--r-full);
+  font-size: 11.5px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text-soft);
+  transition: all var(--fast) var(--ease);
+  white-space: nowrap;
+}
+.read svg { width: 13px; height: 13px; flex: none; }
+.read:hover { border-color: var(--text-mute); color: var(--primary); }
+.read--done {
+  background: var(--success-soft);
+  border-color: color-mix(in srgb, var(--success) 35%, transparent);
+  color: var(--success);
+  cursor: default;
+}
+.read--done:hover { color: var(--success); }
+.read--count { border-style: dashed; }
+.read--all {
+  background: var(--success-soft);
+  border-color: color-mix(in srgb, var(--success) 35%, transparent);
+  color: var(--success);
+  border-style: solid;
+}
+.read__bar {
+  width: 34px; height: 3px;
+  border-radius: var(--r-full);
+  background: var(--gray);
+  overflow: hidden;
+}
+.read__bar span { display: block; height: 100%; background: currentColor; border-radius: var(--r-full); }
+
+.readers { display: flex; flex-direction: column; gap: var(--sp-5); }
+.readers__group > .eyebrow { display: block; margin-bottom: var(--sp-3); }
+.readers__list { display: flex; flex-direction: column; gap: 6px; }
+.reader {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: 9px var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--card);
+}
+.reader__body { flex: 1; min-width: 0; }
+.reader__name { font-size: 13px; font-weight: 500; color: var(--primary); }
+.reader__meta { font-size: 11.5px; color: var(--text-mute); }
+.reader__when { font-size: 11.5px; color: var(--text-soft); flex: none; text-align: right; }
+.reader--pending { border-style: dashed; }
+.reader--pending .reader__name { color: var(--text-soft); }
+
+.readers__summary {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding-bottom: var(--sp-4);
+  margin-bottom: var(--sp-4);
+  border-bottom: 1px solid var(--border);
+}
+.readers__summary strong { font-size: 28px; font-weight: 600; color: var(--primary); letter-spacing: -.03em; }
+.readers__summary span { font-size: 13px; color: var(--text-soft); }
+
+/* ---------- Série de reuniões ---------- */
+.serie-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 11px var(--sp-3);
+  border-radius: var(--r-md);
+  background: var(--info-soft);
+  border-left: 3px solid var(--info);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text);
+}
+.serie-note svg { width: 15px; height: 15px; flex: none; margin-top: 2px; color: var(--info); }
+
 /* ---------- Força da senha ---------- */
 .pw-meter { display: flex; gap: 4px; margin-top: 6px; }
 .pw-meter span {
@@ -3831,10 +3916,13 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
   // ---- Comunicados ----
   async function loadAnnouncements() {
     const items = ((await call("announcements.list")) || [])
-      .map((a) => ({ ...a, areas: normalizeAreas(a.areas) }));
+      .map((a) => ({ ...a, areas: normalizeAreas(a.areas), leituras: a.leituras || [] }));
     return { items };
   }
   const createAnnouncement = (data) => call("announcements.create", data);
+  const markNoticeRead = (id) => call("announcements.read", { id });
+  const unmarkNoticeRead = (id) => call("announcements.unread", { id });
+  const loadAudience = async () => ({ items: (await call("announcements.audience")) || [] });
   const updateAnnouncement = (data) => call("announcements.update", data);
   const deleteAnnouncement = (id) => call("announcements.delete", { id });
 
@@ -3855,6 +3943,8 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
   const createMeeting = (data) => call("meetings.create", data);
   const updateMeeting = (data) => call("meetings.update", data);
   const deleteMeeting = (id) => call("meetings.delete", { id });
+  const deleteMeetingSeries = (serie_id, desde = null) =>
+    call("meetings.deleteSeries", desde ? { serie_id, desde } : { serie_id });
 
   // ---- Contas de acesso ----
   const loadUsers = async () => ({ items: (await call("users.list")) || [] });
@@ -3983,7 +4073,9 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     userPlus: '<circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 12-4.9"/><path d="M17 14v6M14 17h6"/>',
     lock: '<rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
     key: '<circle cx="8" cy="15" r="4"/><path d="m10.8 12.2 8.2-8.2"/><path d="m17 6 2 2"/><path d="m14 9 2 2"/>',
-    ban: '<circle cx="12" cy="12" r="9"/><path d="m5.6 5.6 12.8 12.8"/>'
+    ban: '<circle cx="12" cy="12" r="9"/><path d="m5.6 5.6 12.8 12.8"/>',
+    eyeCheck: '<path d="M2.5 12S6 5.5 12 5.5c1.4 0 2.7.35 3.8.9"/><circle cx="12" cy="12" r="2.6"/><path d="m16 18.5 2 2 4-4"/>',
+    repeat: '<path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>'
   };
 
   function icon(name, size = 20) {
@@ -4156,7 +4248,36 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     </article>`;
   }
 
-  function noticeCard(announcement, index = 0, admin = false, archived = false) {
+  /** Chip de leitura: confirma a própria e mostra quantos já leram. */
+  function readChips(announcement, total) {
+    if (announcement.auto) return "";
+    const lidas = (announcement.leituras || []).length;
+    const meu = announcement.vistoPorMim;
+    const minha = announcement.leituras?.find((l) => l.souEu);
+
+    const proprio = meu
+      ? `<button class="read read--done" data-action="unmark-read" data-id="${escapeHtml(announcement.id)}"
+                 title="Clique para desfazer a confirmação">
+           ${icon("check", 13)} Você leu${minha?.visto_em ? ` · ${escapeHtml(formatDateShort(minha.visto_em))}` : ""}
+         </button>`
+      : `<button class="read" data-action="mark-read" data-id="${escapeHtml(announcement.id)}">
+           ${icon("eyeCheck", 13)} Marcar como lida
+         </button>`;
+
+    const completo = total > 0 && lidas >= total;
+    const pct = total > 0 ? Math.round((lidas / total) * 100) : 0;
+    const contador = `
+      <button class="read ${completo ? "read--all" : "read--count"}"
+              data-action="notice-readers" data-id="${escapeHtml(announcement.id)}"
+              title="Ver quem leu e quem falta">
+        ${lidas} de ${total || "?"} leram
+        <span class="read__bar"><span style="width:${pct}%"></span></span>
+      </button>`;
+
+    return `<span style="display:flex;gap:6px;flex-wrap:wrap">${proprio}${contador}</span>`;
+  }
+
+  function noticeCard(announcement, index = 0, admin = false, archived = false, total = 0) {
     const meta = PRIORITIES[announcement.prioridade] || PRIORITIES["Baixa"];
     const prazoLabel = announcement.prazo
       ? (archived
@@ -4171,7 +4292,10 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
       </div>
       ${(announcement.areas || []).length ? `<div class="tags">${announcement.areas.map(areaTag).join("")}</div>` : ""}
       <p class="notice__msg">${escapeHtml(announcement.mensagem)}</p>
-      <div class="notice__foot">
+      <div class="notice__foot" style="gap:8px">
+        ${readChips(announcement, total)}
+      </div>
+      <div class="notice__foot" style="border-top:0;padding-top:0">
         <span>${escapeHtml(announcement.autor || "Equipe Inspire")}</span>
         <span class="dot"></span>
         <span>${escapeHtml(timeAgo(announcement.data))}</span>
@@ -4350,6 +4474,12 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
   };
   const meetingModeMeta = (mode) => MODE_META[mode] || MODE_META["Presencial"];
 
+  const RECURRENCE_LABEL = {
+    semanal: "semanal",
+    quinzenal: "quinzenal",
+    mensal: "mensal"
+  };
+
   const MEETING_STATUS_META = {
     "Agendada":   { color: "var(--info)",    soft: "var(--info-soft)" },
     "Realizada":  { color: "var(--success)", soft: "var(--success-soft)" },
@@ -4386,6 +4516,11 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
             ${meeting.status && meeting.status !== "Agendada"
               ? `<span class="badge" style="--status-color:${stMeta.color};--status-soft:${stMeta.soft}"><span class="badge__dot"></span>${escapeHtml(meeting.status)}</span>`
               : ""}
+            ${meeting.serie_id ? `
+              <span class="badge" style="--status-color:var(--info);--status-soft:var(--info-soft)"
+                    title="Parte de uma série ${escapeHtml(RECURRENCE_LABEL[meeting.recorrencia] || "recorrente")}">
+                ${icon("repeat", 12)} ${escapeHtml(RECURRENCE_LABEL[meeting.recorrencia] || "Série")}
+              </span>` : ""}
             <span class="badge" style="--status-color:${meta.color};--status-soft:${meta.soft}">
               ${icon(meta.icon, 12)} ${escapeHtml(meeting.modo)}
             </span>
@@ -4914,6 +5049,58 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     sincronizar();
   }
 
+  function readersBody(announcement, audiencia) {
+    const leram = announcement.leituras || [];
+    const vistos = new Set(leram.map((l) => String(l.perfil_id)));
+    const faltam = audiencia.filter((pessoa) => !vistos.has(String(pessoa.id)));
+    const total = audiencia.length;
+
+    const linhaLeu = (l) => {
+      const pessoa = audiencia.find((a) => String(a.id) === String(l.perfil_id));
+      return `
+      <div class="reader">
+        <div class="avatar avatar--xs" style="--status-color:var(--success)">${initials(l.nome || pessoa?.nome || l.email)}</div>
+        <div class="reader__body">
+          <div class="reader__name">${escapeHtml(l.nome || pessoa?.nome || "—")}</div>
+          <div class="reader__meta">${escapeHtml(l.email || pessoa?.email || "")}</div>
+        </div>
+        <span class="reader__when">${escapeHtml(formatDateTime(l.visto_em))}</span>
+      </div>`;
+    };
+
+    const linhaFalta = (pessoa) => `
+      <div class="reader reader--pending">
+        <div class="avatar avatar--xs" style="--status-color:var(--text-mute)">${initials(pessoa.nome || pessoa.email)}</div>
+        <div class="reader__body">
+          <div class="reader__name">${escapeHtml(pessoa.nome || "—")}</div>
+          <div class="reader__meta">${escapeHtml(pessoa.email || "")}</div>
+        </div>
+        <span class="reader__when">—</span>
+      </div>`;
+
+    return `
+    <div class="readers">
+      <div class="readers__summary">
+        <strong>${leram.length}</strong>
+        <span>de ${total} ${total === 1 ? "pessoa" : "pessoas"} confirmaram a leitura</span>
+      </div>
+
+      <div class="readers__group">
+        <span class="eyebrow">Leram · ${leram.length}</span>
+        <div class="readers__list">
+          ${leram.length ? leram.map(linhaLeu).join("") : '<p class="muted" style="font-size:13px">Ninguém confirmou ainda.</p>'}
+        </div>
+      </div>
+
+      <div class="readers__group">
+        <span class="eyebrow">Ainda não leram · ${faltam.length}</span>
+        <div class="readers__list">
+          ${faltam.length ? faltam.map(linhaFalta).join("") : '<p class="muted" style="font-size:13px">Todo mundo já leu.</p>'}
+        </div>
+      </div>
+    </div>`;
+  }
+
   function linkFormBody(link = {}) {
     const value = (key) => escapeHtml(link[key] || "");
     const names = categoryNames();
@@ -5097,6 +5284,31 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
         <input id="m-fim" name="fim" type="time" value="${value("fim") || "10:00"}" required>
       </div>
 
+      <div class="form-section"><span class="eyebrow">Repetição</span></div>
+
+      ${meeting.serie_id ? `
+      <div class="span-2">
+        <div class="serie-note">
+          ${icon("repeat", 15)}
+          <span>Esta reunião faz parte de uma série <strong>${escapeHtml(RECURRENCE_LABEL[meeting.recorrencia] || "recorrente")}</strong>.
+          O que você salvar aqui vale só para este encontro. Para mexer na série inteira, use o botão de excluir.</span>
+        </div>
+      </div>` : `
+      <div class="field">
+        <label class="field__label" for="m-recorrencia">Repetir</label>
+        <select id="m-recorrencia" name="recorrencia">
+          <option value="">Não repete</option>
+          <option value="semanal">Toda semana</option>
+          <option value="quinzenal">A cada duas semanas</option>
+          <option value="mensal">Todo mês, no mesmo dia</option>
+        </select>
+      </div>
+      <div class="field" id="repeatUntilField" style="display:none">
+        <label class="field__label" for="m-ate">Repetir até</label>
+        <input id="m-ate" name="repetirAte" type="date">
+        <span class="field__hint">Cada data vira uma reunião própria, com ata separada.</span>
+      </div>`}
+
       <div class="form-section"><span class="eyebrow">Formato</span></div>
 
       <div class="field">
@@ -5152,6 +5364,25 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
   }
 
   function bindMeetingForm(container, meetings, employees, currentId) {
+    const recorrencia = container.querySelector("#m-recorrencia");
+    const ateField = container.querySelector("#repeatUntilField");
+    if (recorrencia && ateField) {
+      const alternarRepeticao = () => {
+        const repete = Boolean(recorrencia.value);
+        ateField.style.display = repete ? "" : "none";
+        const campoAte = container.querySelector("#m-ate");
+        if (repete && !campoAte.value) {
+          // Sugere três meses de horizonte — dá para encurtar ou esticar.
+          const base = container.querySelector("#m-data").value;
+          const partida = base ? new Date(`${base}T12:00:00`) : new Date();
+          partida.setMonth(partida.getMonth() + 3);
+          campoAte.value = toInputDate(partida);
+        }
+      };
+      recorrencia.addEventListener("change", alternarRepeticao);
+      alternarRepeticao();
+    }
+
     const modo = container.querySelector("#m-modo");
     const linkField = container.querySelector("#linkField");
     const localField = container.querySelector("#localField");
@@ -5530,14 +5761,15 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     if (automatic && !activeArea) {
       html += `<div class="notices__pinned">${birthdayNoticeCard(automatic)}</div>`;
     }
-    html += active.map((item, index) => noticeCard(item, index, admin)).join("");
+    const total = state.audiencia.length;
+    html += active.map((item, index) => noticeCard(item, index, admin, false, total)).join("");
 
     if (archived.length) {
       html += `
       <div class="notices__pinned" style="margin-top:8px">
         <span class="eyebrow" style="display:block;margin-bottom:12px">Arquivados · ${archived.length}</span>
       </div>`;
-      html += archived.map((item, index) => noticeCard(item, index, admin, true)).join("");
+      html += archived.map((item, index) => noticeCard(item, index, admin, true, total)).join("");
     }
     grid.innerHTML = html;
   }
@@ -5703,6 +5935,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     links: [],
     meetings: [],
     users: [],
+    audiencia: [],
     perfil: null,
     isAdmin: false,
     podeEditar: false,
@@ -5914,12 +6147,17 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     }
 
     try {
-      const [employees, announcements, categories, links, meetings] = await Promise.all([
-        loadEmployees(), loadAnnouncements(), loadCategories(), loadLinks(), loadMeetings()
+      const [employees, announcements, categories, links, meetings, audiencia] = await Promise.all([
+        loadEmployees(), loadAnnouncements(), loadCategories(), loadLinks(), loadMeetings(), loadAudience()
       ]);
 
       state.employees = employees.items || [];
-      state.announcements = announcements.items || [];
+      state.audiencia = audiencia.items || [];
+      // Marca qual confirmação é a minha, para o cartão mostrar a data.
+      state.announcements = (announcements.items || []).map((a) => ({
+        ...a,
+        leituras: (a.leituras || []).map((l) => ({ ...l, souEu: String(l.perfil_id) === String(state.perfil?.id) }))
+      }));
       state.links = links.items || [];
       state.meetings = meetings.items || [];
       setCategories(categories.items || []);
@@ -6272,6 +6510,70 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     }
   }
 
+  /**
+   * Confirma ou desfaz a leitura. Atualiza o estado local na hora e só depois
+   * sincroniza — o chip responde ao clique sem esperar a rede.
+   */
+  async function alternarLeitura(id, lida) {
+    const announcement = state.announcements.find((item) => String(item.id) === String(id));
+    if (!announcement) return;
+
+    const antes = announcement.leituras || [];
+    announcement.leituras = lida
+      ? [...antes, {
+          perfil_id: state.perfil.id,
+          nome: state.perfil.nome,
+          email: state.perfil.email,
+          visto_em: new Date().toISOString(),
+          souEu: true
+        }]
+      : antes.filter((l) => String(l.perfil_id) !== String(state.perfil.id));
+    announcement.vistoPorMim = lida;
+    render();
+
+    try {
+      if (lida) await markNoticeRead(id);
+      else await unmarkNoticeRead(id);
+    } catch (error) {
+      announcement.leituras = antes;
+      announcement.vistoPorMim = !lida;
+      render();
+      Toast.error(friendlyMessage(error));
+    }
+  }
+
+  function openReaders(id) {
+    const announcement = state.announcements.find((item) => String(item.id) === String(id));
+    if (!announcement) return;
+    const faltam = state.audiencia.length - (announcement.leituras || []).length;
+    Modal.open({
+      title: "Quem leu o comunicado",
+      subtitle: announcement.titulo,
+      body: readersBody(announcement, state.audiencia),
+      footer: state.podeEditar && faltam > 0 ? `
+        <button class="btn btn--ghost" data-close>Fechar</button>
+        <span class="spacer"></span>
+        <button class="btn btn--ghost" id="copyPending">${icon("mail", 15)} Copiar e-mails de quem falta</button>` : `
+        <button class="btn btn--ghost btn--block" data-close>Fechar</button>`,
+      onMount: (container) => {
+        container.querySelector("#copyPending")?.addEventListener("click", async (event) => {
+          const vistos = new Set((announcement.leituras || []).map((l) => String(l.perfil_id)));
+          const emails = state.audiencia
+            .filter((pessoa) => !vistos.has(String(pessoa.id)))
+            .map((pessoa) => pessoa.email)
+            .filter(Boolean)
+            .join("; ");
+          try {
+            await navigator.clipboard.writeText(emails);
+            event.currentTarget.innerHTML = `${icon("check", 15)} Copiado`;
+          } catch {
+            Toast.warning("O navegador bloqueou a cópia. Os e-mails estão na lista acima.");
+          }
+        });
+      }
+    });
+  }
+
   // ---------- Atalhos e categorias ----------
   function openLinkForm(link = {}) {
     const editing = Boolean(link.id);
@@ -6477,10 +6779,25 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
           button.disabled = true;
           button.innerHTML = '<span class="spinner"></span> Salvando…';
           try {
-            if (editing) await updateMeeting(data);
-            else await createMeeting(data);
-            Modal.close();
-            Toast.success(editing ? "Reunião atualizada." : "Reunião agendada.");
+            if (editing) {
+              await updateMeeting(data);
+              Modal.close();
+              Toast.success("Reunião atualizada.");
+            } else {
+              const resultado = await createMeeting(data);
+              const criadas = resultado?.criadas?.length ?? 1;
+              const puladas = resultado?.puladas ?? [];
+              Modal.close();
+              if (criadas > 1) {
+                Toast.success(`Série criada: ${criadas} reuniões agendadas.`);
+              } else {
+                Toast.success("Reunião agendada.");
+              }
+              if (puladas.length) {
+                const datas = puladas.map((x) => formatDateShort(x.data)).join(", ");
+                Toast.warning(`${puladas.length} data${puladas.length === 1 ? "" : "s"} pulada${puladas.length === 1 ? "" : "s"} por conflito: ${datas}`);
+              }
+            }
             await sync(true);
           } catch (error) {
             Toast.error(friendlyMessage(error));
@@ -6495,6 +6812,12 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
   async function removeMeeting(id) {
     const meeting = state.meetings.find((item) => String(item.id) === String(id));
     if (!meeting) return;
+
+    if (meeting.serie_id) {
+      openSeriesDelete(meeting);
+      return;
+    }
+
     const ok = await Modal.confirm({
       title: "Excluir reunião",
       text: `<strong>${escapeHtml(meeting.titulo)}</strong> sai da agenda.`
@@ -6507,6 +6830,51 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     } catch (error) {
       Toast.error(friendlyMessage(error));
     }
+  }
+
+  /** Reunião de série: separa "só esta" de "esta e as próximas". */
+  function openSeriesDelete(meeting) {
+    const naSerie = state.meetings.filter((m) => m.serie_id === meeting.serie_id);
+    const futuras = naSerie.filter((m) => String(m.data) >= String(meeting.data));
+
+    Modal.open({
+      title: "Excluir reunião recorrente",
+      size: "sm",
+      body: `
+      <div class="confirm">
+        <div class="confirm__icon">${icon("repeat", 24)}</div>
+        <h3>${escapeHtml(meeting.titulo)}</h3>
+        <p>Faz parte de uma série ${escapeHtml(RECURRENCE_LABEL[meeting.recorrencia] || "recorrente")}
+           com <strong>${naSerie.length}</strong> encontros, sendo
+           <strong>${futuras.length}</strong> nesta data ou depois.</p>
+      </div>`,
+      footer: `
+      <button class="btn btn--ghost btn--block" data-close>Cancelar</button>
+      <button class="btn btn--ghost btn--block" id="delOne">Só esta (${escapeHtml(formatDateShort(meeting.data))})</button>
+      <button class="btn btn--danger btn--block" id="delFuture">Esta e as ${futuras.length - 1} próximas</button>`,
+      onMount: (container) => {
+        const executar = async (fn, mensagem, botao) => {
+          botao.disabled = true;
+          botao.innerHTML = '<span class="spinner"></span> Excluindo…';
+          try {
+            await fn();
+            Modal.close();
+            Toast.success(mensagem);
+            await sync(true);
+          } catch (error) {
+            Toast.error(friendlyMessage(error));
+            Modal.close();
+          }
+        };
+
+        container.querySelector("#delOne").addEventListener("click", (event) =>
+          executar(() => deleteMeeting(meeting.id), "Encontro excluído. A série continua.", event.currentTarget));
+
+        container.querySelector("#delFuture").addEventListener("click", (event) =>
+          executar(() => deleteMeetingSeries(meeting.serie_id, meeting.data),
+                   `${futuras.length} encontros excluídos.`, event.currentTarget));
+      }
+    });
   }
 
   // ---------- Contas de acesso ----------
@@ -6887,6 +7255,9 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
         case "new-employee": openEmployeeForm(); break;
 
         case "new-notice": openNoticeForm(); break;
+        case "mark-read": await alternarLeitura(id, true); break;
+        case "unmark-read": await alternarLeitura(id, false); break;
+        case "notice-readers": openReaders(id); break;
         case "edit-notice": openNoticeForm(state.announcements.find((item) => String(item.id) === String(id))); break;
         case "delete-notice": await removeNotice(id); break;
 
