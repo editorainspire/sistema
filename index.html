@@ -439,6 +439,9 @@ h3 { font-size: 16px; }
 .sync[data-state="error"] { border-color: var(--danger); color: var(--danger); }
 .sync[data-state="error"] .sync__dot { background: var(--danger); }
 .sync[data-state="error"] .sync__dot::after { background: var(--danger); }
+.sync { cursor: pointer; }
+.sync:hover { border-color: var(--text-mute); color: var(--primary); }
+.sync[data-state="syncing"] { cursor: default; }
 
 @keyframes pulse {
   0% { transform: scale(.8); opacity: .35; }
@@ -1696,38 +1699,6 @@ html[data-theme="dark"] .badge--cake { color: var(--secondary); }
 .notices__pinned { grid-column: 1 / -1; }
 .notices__pinned .party { margin-bottom: 0; }
 
-/* ---------- Botão flutuante de sincronização ---------- */
-.sync-fab {
-  position: fixed;
-  right: var(--sp-5);
-  bottom: var(--sp-5);
-  z-index: 90;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  height: 48px;
-  padding: 0 20px 0 16px;
-  border-radius: var(--r-full);
-  background: var(--primary);
-  color: var(--bg);
-  font-size: 13px;
-  font-weight: 600;
-  box-shadow: var(--shadow-lg);
-  transition: transform var(--base) var(--ease), box-shadow var(--base) var(--ease), background var(--fast) var(--ease);
-}
-html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary); }
-.sync-fab svg { width: 19px; height: 19px; flex: none; }
-.sync-fab:hover { transform: translateY(-2px) scale(1.02); box-shadow: 0 20px 44px rgba(15,43,70,.24); }
-.sync-fab:active { transform: translateY(0) scale(.97); }
-.sync-fab.is-spinning svg { animation: spin .8s linear infinite; }
-.sync-fab.is-spinning { pointer-events: none; opacity: .85; }
-
-@media (max-width: 720px) {
-  .sync-fab { right: var(--sp-4); bottom: calc(var(--sp-4) + env(safe-area-inset-bottom)); padding: 0; width: 48px; justify-content: center; }
-  .sync-fab__label { display: none; }
-  .toasts { bottom: calc(var(--sp-4) + 60px); }
-}
-
 /* ---------- Agenda de reuniões ---------- */
 .agenda__section { margin-bottom: var(--sp-6); }
 .agenda__section:last-child { margin-bottom: 0; }
@@ -2672,7 +2643,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
   @page { size: A4 landscape; margin: 14mm; }
 
   html, body { background: #fff !important; color: #111 !important; }
-  .sidebar, .header, .filters, .toasts, .modal, .banner, .auth, .sync-fab,
+  .sidebar, .header, .filters, .toasts, .modal, .banner, .auth,
   .emp__actions, .section-head__actions, .view-toggle, .backdrop-mobile { display: none !important; }
 
   .layout { display: block; }
@@ -2938,10 +2909,10 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
           <input id="search" type="search" placeholder="Buscar por nome, cargo, equipe…  (tecle /)" aria-label="Buscar colaborador">
         </div>
 
-        <div class="sync" id="sync" data-state="syncing" title="Estado da sincronização com o servidor">
+        <button class="sync" id="sync" data-state="syncing" title="Clique para buscar dados atualizados">
           <span class="sync__dot"></span>
           <span class="sync__text">Sincronizando…</span>
-        </div>
+        </button>
 
         <button class="icon-btn" id="themeToggle" aria-label="Alternar tema"></button>
 
@@ -3310,11 +3281,6 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
       </main>
     </div>
   </div>
-
-  <button class="sync-fab" id="syncFab" aria-label="Buscar dados atualizados" title="Buscar dados atualizados — o painel não atualiza sozinho" hidden>
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>
-    <span class="sync-fab__label">Sincronizar</span>
-  </button>
 
   <div class="toasts" id="toasts" aria-live="polite"></div>
   <div id="modalRoot"></div>
@@ -4195,16 +4161,44 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     }
   }
 
-  // ---- Colaboradores ----
-  async function loadEmployees() {
-    const items = ((await call("employees.list")) || []).map((e) => {
+  // ---- Normalização do que vem do servidor ----
+  function normEmployees(lista = []) {
+    return lista.map((e) => {
       let historico = e.historico;
       if (typeof historico === "string") {
         try { historico = JSON.parse(historico); } catch { historico = []; }
       }
       return { ...e, historico: Array.isArray(historico) ? historico : [] };
     });
-    return { items };
+  }
+
+  function normAnnouncements(lista = []) {
+    return lista.map((a) => ({
+      ...a,
+      areas: normalizeAreas(a.areas),
+      leituras: a.leituras || [],
+      comentarios: a.comentarios || []
+    }));
+  }
+
+  /**
+   * Uma requisição só para tudo o que a tela precisa. Antes eram seis, cada
+   * uma revalidando a mesma sessão antes de consultar o banco.
+   */
+  async function loadPainel(acoes) {
+    const { resultado, erros } = await call("batch", { acoes });
+    const falhas = Object.entries(erros || {});
+    // users.list falha de propósito para quem não é admin: não é erro de rede.
+    const relevantes = falhas.filter(([nome]) => nome !== "users.list");
+    if (relevantes.length && !Object.keys(resultado || {}).length) {
+      throw new ApiError(relevantes[0][1], { code: "server" });
+    }
+    return { resultado: resultado || {}, erros: erros || {} };
+  }
+
+  // ---- Colaboradores ----
+  async function loadEmployees() {
+    return { items: normEmployees((await call("employees.list")) || []) };
   }
   const createEmployee = (data) => call("employees.create", data);
   const updateEmployee = (data) => call("employees.update", data);
@@ -4213,14 +4207,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
 
   // ---- Comunicados ----
   async function loadAnnouncements() {
-    const items = ((await call("announcements.list")) || [])
-      .map((a) => ({
-        ...a,
-        areas: normalizeAreas(a.areas),
-        leituras: a.leituras || [],
-        comentarios: a.comentarios || []
-      }));
-    return { items };
+    return { items: normAnnouncements((await call("announcements.list")) || []) };
   }
   const createAnnouncement = (data) => call("announcements.create", data);
   const markNoticeRead = (id) => call("announcements.read", { id });
@@ -6405,7 +6392,9 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     filters: { departamento: "", equipe: "", cargo: "", responsavel: "" },
     loading: true,
     tokenRecuperacao: null,
-    emailRecuperacao: ""
+    emailRecuperacao: "",
+    dadosIniciais: null,
+    usuariosEm: 0
   };
 
   const PAPEL_LABEL = { admin: "Administrador", editor: "Editor", leitor: "Leitor" };
@@ -6433,7 +6422,6 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
   }
   function mostrarAuth(painel = "login") {
     el("appShell").hidden = true;
-    el("syncFab").hidden = true;
     el("authScreen").hidden = false;
     document.body.classList.remove("is-admin", "can-edit");
     mostrarPainel(painel);
@@ -6647,7 +6635,14 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
 
   async function entrarNoApp() {
     try {
-      state.perfil = await loadMyProfile();
+      // Perfil e dados na mesma requisição: o login abre o painel de uma vez.
+      const { resultado } = await loadPainel([
+        "users.me", "employees.list", "announcements.list", "announcements.audience",
+        "categories.list", "links.list", "meetings.list"
+      ]);
+      state.perfil = resultado["users.me"];
+      if (!state.perfil) throw new ApiError(FRIENDLY.auth, { code: "auth" });
+      state.dadosIniciais = resultado;
     } catch (error) {
       // Conta pendente ou bloqueada chega aqui: a mensagem do servidor já
       // explica o caso, então vai direto para a tela de acesso.
@@ -6663,7 +6658,6 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
 
     el("authScreen").hidden = true;
     el("appShell").hidden = false;
-    el("syncFab").hidden = false;
     document.body.classList.toggle("is-admin", state.isAdmin);
     document.body.classList.toggle("can-edit", state.podeEditar);
 
@@ -6672,7 +6666,17 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     el("userInitials").textContent = initials(state.perfil.nome || state.perfil.email);
     el("userRole").textContent = PAPEL_LABEL[state.perfil?.papel] || PAPEL_LABEL.leitor;
 
-    await sync();
+    // Os dados já vieram com o perfil: pinta a tela sem uma segunda ida à rede.
+    aplicarDados(state.dadosIniciais || {});
+    state.dadosIniciais = null;
+    state.loading = false;
+    SyncIndicator.set("ok", `Atualizado às ${formatTime()}`);
+    render();
+
+    if (state.isAdmin) {
+      carregarUsuarios(true);
+      processVacationReturns();
+    }
     mostrarPendentesDeLeitura();
   }
 
@@ -6700,20 +6704,14 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     }
 
     try {
-      const [employees, announcements, categories, links, meetings, audiencia] = await Promise.all([
-        loadEmployees(), loadAnnouncements(), loadCategories(), loadLinks(), loadMeetings(), loadAudience()
-      ]);
+      const acoes = [
+        "employees.list", "announcements.list", "announcements.audience",
+        "categories.list", "links.list", "meetings.list"
+      ];
+      if (state.isAdmin) acoes.push("users.list");
 
-      state.employees = employees.items || [];
-      state.audiencia = audiencia.items || [];
-      // Marca qual confirmação é a minha, para o cartão mostrar a data.
-      state.announcements = (announcements.items || []).map((a) => ({
-        ...a,
-        leituras: (a.leituras || []).map((l) => ({ ...l, souEu: String(l.perfil_id) === String(state.perfil?.id) }))
-      }));
-      state.links = links.items || [];
-      state.meetings = meetings.items || [];
-      setCategories(categories.items || []);
+      const { resultado } = await loadPainel(acoes);
+      aplicarDados(resultado);
 
       state.loading = false;
       SyncIndicator.set("ok", `Atualizado às ${formatTime()}`);
@@ -6730,6 +6728,29 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
         showOfflineBanner(true, friendlyMessage(error));
       }
       render();
+    }
+  }
+
+  /** Distribui o resultado do batch pelo estado. */
+  function aplicarDados(resultado) {
+    if (resultado["employees.list"]) state.employees = normEmployees(resultado["employees.list"]);
+    if (resultado["announcements.audience"]) state.audiencia = resultado["announcements.audience"];
+    if (resultado["categories.list"]) setCategories(resultado["categories.list"]);
+    if (resultado["links.list"]) state.links = resultado["links.list"];
+    if (resultado["meetings.list"]) state.meetings = resultado["meetings.list"];
+    if (resultado["users.list"]) {
+      state.users = resultado["users.list"];
+      state.usuariosEm = Date.now();
+    }
+
+    if (resultado["announcements.list"]) {
+      // Marca qual confirmação é a minha, para o cartão mostrar a data.
+      state.announcements = normAnnouncements(resultado["announcements.list"]).map((a) => ({
+        ...a,
+        leituras: (a.leituras || []).map((l) => ({
+          ...l, souEu: String(l.perfil_id) === String(state.perfil?.id)
+        }))
+      }));
     }
   }
 
@@ -6856,11 +6877,18 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     }
   }
 
-  async function carregarUsuarios(silent = true) {
+  async function carregarUsuarios(silent = true, forcar = false) {
     if (!state.isAdmin) return;
+    // Recarregar a cada visita à aba deixava a tela travada por um instante
+    // sem necessidade: a lista muda pouco.
+    if (!forcar && state.users.length && Date.now() - state.usuariosEm < 60000) {
+      renderUserTable();
+      return;
+    }
     try {
       const { items } = await loadUsers();
       state.users = items || [];
+      state.usuariosEm = Date.now();
       const pendentes = state.users.filter((c) => c.pendente).length;
       const contaUsers = document.getElementById("navCountUsers");
       contaUsers.textContent = pendentes ? `${pendentes} novo${pendentes === 1 ? "" : "s"}` : state.users.length;
@@ -7652,7 +7680,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
             else await createUser(data);
             Modal.close();
             Toast.success(editing ? "Conta atualizada." : "Conta criada. Passe a senha para a pessoa.");
-            await carregarUsuarios();
+            await carregarUsuarios(true, true);
           } catch (error) {
             Toast.error(friendlyMessage(error));
             button.disabled = false;
@@ -7762,7 +7790,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
             await approveUser(conta.id, papel, ficha);
             Modal.close();
             Toast.success(`${firstName(conta.nome) || conta.email} já pode entrar como ${PAPEL_LABEL[papel].toLowerCase()}.`);
-            await carregarUsuarios(true);
+            await carregarUsuarios(true, true);
           } catch (error) {
             Toast.error(friendlyMessage(error));
             button.disabled = false;
@@ -7785,7 +7813,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     try {
       await rejectUser(id);
       Toast.success("Cadastro recusado.");
-      await carregarUsuarios(true);
+      await carregarUsuarios(true, true);
     } catch (error) {
       Toast.error(friendlyMessage(error));
     }
@@ -7802,7 +7830,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     try {
       await deleteUser(id);
       Toast.success("Conta excluída.");
-      await carregarUsuarios();
+      await carregarUsuarios(true, true);
     } catch (error) {
       Toast.error(friendlyMessage(error));
     }
@@ -8057,12 +8085,11 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     });
 
     document.getElementById("bannerRetry").addEventListener("click", () => sync());
-    document.getElementById("syncFab").addEventListener("click", async (event) => {
-      const fab = event.currentTarget;
-      fab.classList.add("is-spinning");
-      try { await sync(); } finally { fab.classList.remove("is-spinning"); }
-    });
 
+    // Sem botão flutuante: o indicador do cabeçalho é o gatilho de atualização.
+    document.getElementById("sync").addEventListener("click", () => {
+      if (document.getElementById("sync").dataset.state !== "syncing") sync();
+    });
     document.getElementById("importInput").addEventListener("change", (event) => {
       handleImport(event.target.files[0]);
       event.target.value = "";
@@ -8112,7 +8139,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
           break;
         }
         case "reject-user": await rejectUserAccount(id); break;
-        case "refresh-users": await carregarUsuarios(); Toast.success("Contas atualizadas."); break;
+        case "refresh-users": await carregarUsuarios(false, true); Toast.success("Contas atualizadas."); break;
 
         case "import": document.getElementById("importInput").click(); break;
         case "refresh": sync(); break;
