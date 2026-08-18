@@ -2454,8 +2454,40 @@ html[data-theme="dark"] .badge--cake { color: var(--secondary); }
 .comment:hover .comment__del { opacity: 1; }
 .comment__del:hover { background: var(--danger-soft); color: var(--danger); }
 
-.thread__form { display: flex; flex-direction: column; gap: var(--sp-2); margin-top: var(--sp-4); }
-.thread__form textarea { min-height: 76px; }
+.thread__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin-top: var(--sp-4);
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--border);
+}
+
+/*
+ * O campo fica fora de um .field, então precisa do estilo aqui — sem isto o
+ * navegador aplicava o textarea cru, estreito e com borda cinza.
+ */
+.thread__form textarea {
+  width: 100%;
+  min-height: 84px;
+  padding: 11px var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.55;
+  resize: vertical;
+  outline: none;
+  display: block;
+  transition: border-color var(--fast) var(--ease), box-shadow var(--fast) var(--ease);
+}
+.thread__form textarea::placeholder { color: var(--text-mute); }
+.thread__form textarea:focus {
+  border-color: var(--secondary);
+  box-shadow: 0 0 0 4px var(--secondary-soft);
+}
 .thread__actions { display: flex; align-items: center; gap: var(--sp-3); }
 .thread__count { font-size: 11px; color: var(--text-mute); margin-right: auto; }
 
@@ -2483,6 +2515,7 @@ html[data-theme="dark"] .badge--cake { color: var(--secondary); }
 .mention--me { color: var(--secondary); background: var(--secondary-soft); }
 
 .mention-box { position: relative; }
+.mention-box textarea { position: relative; z-index: 1; }
 
 .mention-list {
   position: absolute;
@@ -2509,9 +2542,23 @@ html[data-theme="dark"] .badge--cake { color: var(--secondary); }
   text-align: left;
   transition: background var(--fast) var(--ease);
 }
-.mention-item:hover, .mention-item.is-cursor { background: var(--primary-soft); }
-.mention-item__name { font-size: 12.5px; font-weight: 500; color: var(--primary); }
-.mention-item__mail { font-size: 11px; color: var(--text-mute); }
+.mention-item:hover,
+.mention-item.is-cursor,
+.mention-item.is-on { background: var(--primary-soft); }
+.mention-item__body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+.mention-item__name {
+  font-size: 12.5px; font-weight: 500; color: var(--primary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.mention-item__mail {
+  font-size: 11px; color: var(--text-mute);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 
 /* ---------- Avisos ---------- */
 .bell { position: relative; }
@@ -7823,7 +7870,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     const desenhar = () => {
       if (!candidatos.length) { fechar(); return; }
       lista.innerHTML = candidatos.map((pessoa, i) => `
-        <button type="button" class="mention-item ${i === destaque ? "is-on" : ""}" data-mention="${escapeHtml(pessoa.id)}">
+        <button type="button" class="mention-item ${i === destaque ? "is-cursor" : ""}" data-mention="${escapeHtml(pessoa.id)}">
           <span class="avatar avatar--xs" style="--status-color:var(--primary)">${initials(pessoa.nome || pessoa.email)}</span>
           <span class="mention-item__body">
             <span class="mention-item__name">${escapeHtml(pessoa.nome || "Sem nome")}</span>
@@ -7918,22 +7965,26 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
       </div>`;
     }
 
+    const cor = {
+      mencao: ["var(--secondary)", "var(--secondary-soft)"],
+      reuniao: ["var(--info)", "var(--info-soft)"]
+    };
+
     return `
-    <div class="thread">
-      ${state.avisos.map((aviso) => `
-      <button class="comment" style="width:100%;text-align:left" data-aviso="${escapeHtml(aviso.id)}"
-              data-destino="${escapeHtml(aviso.destino || "")}">
-        <div class="avatar avatar--xs" style="--status-color:${aviso.tipo === "reuniao" ? "var(--info)" : "var(--secondary)"}">
-          ${icon(AVISO_ICONE[aviso.tipo] || "info", 13)}
-        </div>
-        <div class="comment__body">
-          <div class="comment__head">
-            <span class="comment__name">${escapeHtml(aviso.titulo)}</span>
-            <span class="comment__when">${escapeHtml(formatDateTime(aviso.criado_em))}</span>
-          </div>
-          <div class="comment__text">${escapeHtml(aviso.texto)}</div>
-        </div>
-      </button>`).join("")}
+    <div class="notif-list">
+      ${state.avisos.map((aviso) => {
+        const [c, soft] = cor[aviso.tipo] || ["var(--text-mute)", "var(--gray)"];
+        return `
+        <button class="notif" style="--notif-color:${c};--notif-soft:${soft}"
+                data-aviso="${escapeHtml(aviso.id)}" data-destino="${escapeHtml(aviso.destino || "")}">
+          <span class="notif__icon">${icon(AVISO_ICONE[aviso.tipo] || "info", 16)}</span>
+          <span class="notif__body">
+            <span class="notif__title">${escapeHtml(aviso.titulo)}</span>
+            <span class="notif__text">${escapeHtml(aviso.texto)}</span>
+            <span class="notif__when">${escapeHtml(formatDateTime(aviso.criado_em))}</span>
+          </span>
+        </button>`;
+      }).join("")}
     </div>`;
   }
 
@@ -8610,10 +8661,12 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
         <div class="field span-2">
           <label class="field__label" for="a-colab">Ficha na equipe</label>
           <select id="a-colab" name="colaborador_id">
-            <option value="" ${temFicha ? "" : "selected"}>Sem vínculo</option>
+            <option value="" ${temFicha ? "" : "selected"}>Criar ficha nova automaticamente</option>
             ${vinculos}
           </select>
-          ${temFicha ? '<span class="field__hint">Encontramos uma ficha com o mesmo e-mail — já deixamos selecionada.</span>' : ""}
+          <span class="field__hint">${temFicha
+            ? "Encontramos uma ficha com o mesmo e-mail — já deixamos selecionada."
+            : "Deixando em branco, a ficha é criada automaticamente com o nome e o e-mail da conta."}</span>
         </div>
       </form>`,
       footer: `
@@ -8630,7 +8683,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
           try {
             await approveUser(conta.id, papel, ficha);
             Modal.close();
-            Toast.success(`${firstName(conta.nome) || conta.email} já pode entrar como ${PAPEL_LABEL[papel].toLowerCase()}.`);
+            Toast.success(`${firstName(conta.nome) || conta.email} entrou na equipe e já pode acessar como ${PAPEL_LABEL[papel].toLowerCase()}.`);
             await carregarUsuarios(true, true);
             // Sem isto a conta aprovada não aparecia no seletor de colaborador:
             // é o sync que recarrega a lista de contas ativas.
