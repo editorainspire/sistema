@@ -5466,6 +5466,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
 
         // Ficha existente: dá para trocar ou desfazer o vínculo.
         const atual = contaDaFicha(employee.id);
+        // Só contas livres, mais a atual: uma conta não pode ter duas fichas.
         const opcoes = [...(atual ? [atual] : []), ...contasSemFicha()]
           .map((c) => `<option value="${escapeHtml(c.id)}" ${atual && c.id === atual.id ? "selected" : ""}>
                          ${escapeHtml(c.nome || c.email)} — ${escapeHtml(c.email)}
@@ -8500,15 +8501,23 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
 
   /** Aprovar é onde a permissão é decidida — por isso pede confirmação. */
   function openApproveUser(conta) {
-    const vinculos = state.employees
-      .map((person) => {
-        const sugerido = String(person.email || "").toLowerCase() === String(conta.email || "").toLowerCase();
-        return `<option value="${escapeHtml(person.id)}" ${sugerido ? "selected" : ""}>${escapeHtml(person.nome)}</option>`;
-      }).join("");
+    // Só fichas sem dono entram na lista. Oferecer a equipe inteira convidava
+    // a escolher a pessoa errada e fazer duas contas dividirem um cadastro.
+    const ocupadas = new Set(
+      state.audiencia.map((c) => String(c.colaborador_id)).filter((id) => id && id !== "null")
+    );
+    const livres = state.employees.filter((person) => !ocupadas.has(String(person.id)));
 
-    const temFicha = state.employees.some(
+    const mesmoEmail = livres.find(
       (person) => String(person.email || "").toLowerCase() === String(conta.email || "").toLowerCase()
     );
+
+    const vinculos = livres
+      .map((person) => `<option value="${escapeHtml(person.id)}" ${mesmoEmail && person.id === mesmoEmail.id ? "selected" : ""}>
+                          ${escapeHtml(person.nome)}${person.email ? ` — ${escapeHtml(person.email)}` : ""}
+                        </option>`).join("");
+
+    const temFicha = Boolean(mesmoEmail);
 
     Modal.open({
       title: "Aprovar acesso",
@@ -8540,7 +8549,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
           </select>
         </div>
         <div class="field span-2">
-          <label class="field__label" for="a-colab">Ficha na equipe</label>
+          <label class="field__label" for="a-colab">Ficha na equipe (sem dono)</label>
           <select id="a-colab" name="colaborador_id">
             <option value="" ${temFicha ? "" : "selected"}>Criar ficha nova automaticamente</option>
             ${vinculos}
