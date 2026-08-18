@@ -2629,6 +2629,169 @@ html[data-theme="dark"] .badge--cake { color: var(--secondary); }
 }
 .linked-field svg { color: var(--text-mute); flex: none; }
 
+/* ---------- Organograma ---------- */
+.org {
+  overflow-x: auto;
+  padding: var(--sp-5) var(--sp-4) var(--sp-6);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-xs);
+}
+.org__canvas {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 100%;
+}
+
+/* Cada ramo empilha o cartão e, abaixo, a fileira de filhos. */
+.org-branch { display: flex; flex-direction: column; align-items: center; }
+
+.org-branch__kids {
+  display: flex;
+  justify-content: center;
+  gap: var(--sp-4);
+  position: relative;
+  padding-top: 26px;
+}
+/* Traço que desce do cartão até a barra horizontal. */
+.org-branch__kids::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 50%;
+  width: 2px; height: 13px;
+  background: var(--border);
+}
+
+.org-kid { position: relative; display: flex; flex-direction: column; align-items: center; padding-top: 13px; }
+/* Barra horizontal ligando os irmãos, cortada nas pontas. */
+.org-kid::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--border);
+}
+.org-kid:first-child::after { left: 50%; }
+.org-kid:last-child::after { right: 50%; }
+.org-kid:only-child::after { display: none; }
+/* Traço que sobe de cada filho até a barra. */
+.org-kid::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 50%;
+  width: 2px; height: 13px;
+  background: var(--border);
+}
+
+/* Todas as caixas do mesmo tamanho: largura fixa e texto contido. */
+.org-card {
+  position: relative;
+  width: 196px;
+  min-height: 78px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--org-color, var(--secondary));
+  border-radius: var(--r-md);
+  background: var(--card);
+  box-shadow: var(--shadow-xs);
+  transition: transform var(--fast) var(--ease), box-shadow var(--fast) var(--ease), border-color var(--fast) var(--ease);
+}
+.org-card__name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary);
+  letter-spacing: -.01em;
+  line-height: 1.3;
+  /* Nome longo quebra em até duas linhas e corta, para a caixa não crescer. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+.org-card__meta { font-size: 11px; color: var(--text-mute); }
+.org-card__grip {
+  position: absolute;
+  top: 8px; right: 8px;
+  color: var(--text-mute);
+  opacity: 0;
+  transition: opacity var(--fast) var(--ease);
+}
+.org-card__grip svg { width: 14px; height: 14px; }
+.org-card:hover .org-card__grip { opacity: 1; }
+
+.org-card--root {
+  width: 232px;
+  border-left-width: 1px;
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--bg);
+  align-items: center;
+  text-align: center;
+}
+html[data-theme="dark"] .org-card--root { color: #0B1622; }
+.org-card--root .org-card__name { color: inherit; font-size: 14.5px; }
+.org-card--root .org-card__meta { color: inherit; opacity: .75; }
+
+body.can-edit .org-card--movel { cursor: grab; }
+body.can-edit .org-card--movel:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.org-card.is-dragging { opacity: .4; }
+.org-card.is-target {
+  border-color: var(--success);
+  box-shadow: 0 0 0 3px var(--success-soft);
+}
+
+/* Pessoas de cada área, na mesma largura da caixa. */
+.org-people {
+  width: 196px;
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.org-person {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 7px;
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  font-size: 11.5px;
+  color: var(--text-soft);
+  transition: background var(--fast) var(--ease);
+}
+.org-person:hover { background: var(--gray); }
+.org-person__dot { width: 6px; height: 6px; border-radius: 50%; background: var(--status-color, var(--text-mute)); flex: none; }
+.org-person__name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.org-people__more { font-size: 10.5px; color: var(--text-mute); text-align: center; padding-top: 2px; }
+
+.org-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 11px var(--sp-3);
+  margin-bottom: var(--sp-4);
+  border-radius: var(--r-md);
+  background: var(--info-soft);
+  border-left: 3px solid var(--info);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.org-hint svg { width: 15px; height: 15px; flex: none; margin-top: 2px; color: var(--info); }
+
+@media (max-width: 720px) {
+  .org-card, .org-people { width: 158px; }
+  .org-card--root { width: 190px; }
+  .org-branch__kids { gap: var(--sp-3); }
+  .org-card__grip { opacity: 1; }
+}
+
 /* ---------- Abas ---------- */
 .tabs {
   display: flex;
@@ -3121,6 +3284,12 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
           <span class="nav__count" id="navCountMeetings">0</span>
         </button>
 
+        <button class="nav__item" data-view="organograma">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="5" rx="1"/><rect x="2" y="16" width="6" height="5" rx="1"/><rect x="16" y="16" width="6" height="5" rx="1"/><path d="M12 7v4M5 16v-3h14v3"/></svg>
+          Organograma
+          <span class="nav__count" id="navCountOrg">0</span>
+        </button>
+
         <button class="nav__item" data-view="atalhos">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>
           Atalhos
@@ -3372,6 +3541,23 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
           </div>
 
           <div class="agenda" id="agenda"></div>
+        </section>
+
+        <!-- ========== Organograma ========== -->
+        <section class="view" id="view-organograma">
+          <div class="section-head">
+            <div>
+              <h1>Organograma</h1>
+              <p>Como os departamentos se organizam. Toda área nasce ligada à Editora Inspire.</p>
+            </div>
+          </div>
+
+          <div class="org-hint" data-edit-only>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></svg>
+            <span>Arraste uma área para dentro de outra para torná-la subárea. Solte na caixa da Editora Inspire para trazê-la de volta ao topo. No celular, use o botão de mover no canto de cada caixa.</span>
+          </div>
+
+          <div class="org" id="orgChart"></div>
         </section>
 
         <!-- ========== Atalhos ========== -->
@@ -4510,6 +4696,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     call("announcements.comment", { id, texto, mencoes });
   const removeComment = (id) => call("announcements.commentDelete", { id });
   const loadNotifications = async () => ({ items: (await call("notifications.list")) || [] });
+  const moveOrgNode = (nome, pai) => call("org.move", { nome, pai });
   const markNotificationsSeen = (ids = null) => call("notifications.seen", ids ? { ids } : {});
   const loadAudience = async () => ({ items: (await call("announcements.audience")) || [] });
   const updateAnnouncement = (data) => call("announcements.update", data);
@@ -4672,6 +4859,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     envelope: '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 8 10 6 10-6"/><circle cx="19" cy="6" r="3" fill="currentColor" stroke="none"/>',
     chat: '<path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9 9 0 0 1-3.9-.9L3 20.5l1.5-4.6A8.4 8.4 0 0 1 3.6 11.5 8.4 8.4 0 0 1 12 3.1a8.4 8.4 0 0 1 9 8.4z"/>',
     send: '<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/>',
+    move: '<circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/>',
     bell: '<path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>',
     at: '<circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 5.4 1.8A10 10 0 1 0 17 20"/>'
   };
@@ -6833,6 +7021,143 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     container.innerHTML = barra + painel;
   }
 
+  // ---------- Organograma ----------
+  const ORG_RAIZ = "Editora Inspire";
+  const ORG_MAX_PESSOAS = 6;
+
+  /**
+   * Monta a árvore. Os departamentos vêm das fichas da equipe; a tabela do
+   * organograma só diz quem ficou embaixo de quem. O que não tem pai válido
+   * pendura na raiz — inclusive um departamento recém-criado, que assim
+   * aparece sem ninguém precisar cadastrar nada.
+   */
+  function montarOrganograma(employees, hierarquia) {
+    const areas = new Map();
+    employees.forEach((pessoa) => {
+      const area = String(pessoa.departamento || "").trim();
+      if (!area) return;
+      if (!areas.has(area)) areas.set(area, []);
+      areas.get(area).push(pessoa);
+    });
+
+    // Áreas que existem só na hierarquia (ficaram sem gente) continuam no mapa.
+    (hierarquia || []).forEach((linha) => {
+      if (linha.nome && !areas.has(linha.nome)) areas.set(linha.nome, []);
+      if (linha.pai && linha.pai !== ORG_RAIZ && !areas.has(linha.pai)) areas.set(linha.pai, []);
+    });
+
+    const paiDe = new Map(
+      (hierarquia || [])
+        .filter((l) => l.pai && l.pai !== ORG_RAIZ && areas.has(l.pai))
+        .map((l) => [l.nome, l.pai])
+    );
+
+    // Defesa contra laço: se a cadeia se fechar, a área volta para a raiz.
+    const paiSeguro = (nome) => {
+      let atual = paiDe.get(nome);
+      const vistos = new Set([nome]);
+      while (atual) {
+        if (vistos.has(atual)) return "";
+        vistos.add(atual);
+        atual = paiDe.get(atual);
+      }
+      return paiDe.get(nome) || "";
+    };
+
+    const filhos = new Map();
+    [...areas.keys()].sort((a, b) => a.localeCompare(b, "pt-BR")).forEach((nome) => {
+      const pai = paiSeguro(nome);
+      if (!filhos.has(pai)) filhos.set(pai, []);
+      filhos.get(pai).push(nome);
+    });
+
+    const nó = (nome) => ({
+      nome,
+      pessoas: (areas.get(nome) || []).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")),
+      filhos: (filhos.get(nome) || []).map(nó)
+    });
+
+    return { raizes: (filhos.get("") || []).map(nó), total: areas.size };
+  }
+
+  function orgPessoas(pessoas) {
+    if (!pessoas.length) {
+      return `<div class="org-people"><div class="org-people__more">Sem pessoas nesta área</div></div>`;
+    }
+    const mostra = pessoas.slice(0, ORG_MAX_PESSOAS);
+    const resto = pessoas.length - mostra.length;
+    return `
+    <div class="org-people">
+      ${mostra.map((pessoa) => {
+        const meta = statusMeta(pessoa.status);
+        return `
+        <div class="org-person" title="${escapeHtml(pessoa.nome)}${pessoa.cargo ? " · " + escapeHtml(pessoa.cargo) : ""}">
+          <span class="org-person__dot" style="--status-color:${meta.color}"></span>
+          <span class="org-person__name">${escapeHtml(pessoa.nome)}</span>
+        </div>`;
+      }).join("")}
+      ${resto > 0 ? `<div class="org-people__more">+ ${resto} pessoa${resto === 1 ? "" : "s"}</div>` : ""}
+    </div>`;
+  }
+
+  function orgRamo(no, admin) {
+    const total = (function contar(n) {
+      return n.pessoas.length + n.filhos.reduce((soma, f) => soma + contar(f), 0);
+    })(no);
+
+    const { color } = areaColor(no.nome);
+
+    return `
+    <div class="org-branch">
+      <div class="org-card org-card--movel" style="--org-color:${color}"
+           data-org-node="${escapeHtml(no.nome)}"
+           ${admin ? 'draggable="true"' : ""}>
+        ${admin ? `<span class="org-card__grip" data-org-menu="${escapeHtml(no.nome)}" title="Mover esta área">${icon("move", 14)}</span>` : ""}
+        <span class="org-card__name">${escapeHtml(no.nome)}</span>
+        <span class="org-card__meta">${no.pessoas.length} direto${no.pessoas.length === 1 ? "" : "s"}${
+          no.filhos.length ? ` · ${total} no total` : ""}</span>
+      </div>
+
+      ${orgPessoas(no.pessoas)}
+
+      ${no.filhos.length ? `
+      <div class="org-branch__kids">
+        ${no.filhos.map((filho) => `<div class="org-kid">${orgRamo(filho, admin)}</div>`).join("")}
+      </div>` : ""}
+    </div>`;
+  }
+
+  function renderOrganograma(employees, hierarquia, admin) {
+    const container = document.getElementById("orgChart");
+    if (!container) return;
+
+    const { raizes, total } = montarOrganograma(employees, hierarquia);
+    const contador = document.getElementById("navCountOrg");
+    if (contador) contador.textContent = total;
+
+    if (!raizes.length) {
+      container.innerHTML = emptyState({
+        title: "Nenhum departamento ainda",
+        text: "Preencha o campo Departamento na ficha das pessoas e as áreas aparecem aqui automaticamente.",
+        iconName: "users"
+      });
+      return;
+    }
+
+    container.innerHTML = `
+    <div class="org__canvas">
+      <div class="org-branch">
+        <div class="org-card org-card--root" data-org-node="${escapeHtml(ORG_RAIZ)}">
+          <span class="org-card__name">${escapeHtml(ORG_RAIZ)}</span>
+          <span class="org-card__meta">${employees.length} pessoas · ${total} área${total === 1 ? "" : "s"}</span>
+        </div>
+        <div class="org-branch__kids">
+          ${raizes.map((raiz) => `<div class="org-kid">${orgRamo(raiz, admin)}</div>`).join("")}
+        </div>
+      </div>
+    </div>`;
+  }
+
   function renderMeetingStrip(meetings) {
     const container = document.getElementById("meetingStrip");
     if (!container) return;
@@ -6887,7 +7212,8 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     usuariosEm: 0,
     agendaTab: "",
     seriesAbertas: new Set(),
-    avisos: []
+    avisos: [],
+    organograma: []
   };
 
   const PAPEL_LABEL = { admin: "Administrador", editor: "Editor", leitor: "Leitor" };
@@ -6900,6 +7226,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     equipe:     ["Equipe", "Todos os colaboradores cadastrados"],
     comunicados:["Comunicados", "Avisos internos da Editora Inspire"],
     reunioes:   ["Reuniões", "Agenda da equipe, sem conflito de horário"],
+    organograma:["Organograma", "Como os departamentos se organizam"],
     atalhos:    ["Atalhos", "Links que a equipe usa todo dia"],
     admin:      ["Administração", "Cadastros, importação e relatórios"],
     usuarios:   ["Contas de acesso", "Quem entra no painel e com qual permissão"]
@@ -7131,7 +7458,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
       // Perfil e dados na mesma requisição: o login abre o painel de uma vez.
       const { resultado } = await loadPainel([
         "users.me", "employees.list", "announcements.list", "announcements.audience",
-        "categories.list", "links.list", "meetings.list", "notifications.list"
+        "categories.list", "links.list", "meetings.list", "notifications.list", "org.list"
       ]);
       state.perfil = resultado["users.me"];
       if (!state.perfil) throw new ApiError(FRIENDLY.auth, { code: "auth" });
@@ -7200,7 +7527,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     try {
       const acoes = [
         "employees.list", "announcements.list", "announcements.audience",
-        "categories.list", "links.list", "meetings.list", "notifications.list"
+        "categories.list", "links.list", "meetings.list", "notifications.list", "org.list"
       ];
       if (state.isAdmin) acoes.push("users.list");
 
@@ -7232,6 +7559,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     if (resultado["categories.list"]) setCategories(resultado["categories.list"]);
     if (resultado["links.list"]) state.links = resultado["links.list"];
     if (resultado["meetings.list"]) state.meetings = resultado["meetings.list"];
+    if (resultado["org.list"]) state.organograma = resultado["org.list"];
     if (resultado["notifications.list"]) {
       state.avisos = resultado["notifications.list"];
       atualizarSino();
@@ -7348,6 +7676,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     renderLinkChips(state.links, state.linkFilter);
     renderLinks(state.links, admin, state.linkFilter, state.search);
     renderAgenda(state.meetings, state.employees, admin);
+    renderOrganograma(state.employees, state.organograma, admin);
     renderUserTable();
 
     // A partir daqui as animações de entrada param, para o redesenho de cada
@@ -8670,6 +8999,149 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     });
   }
 
+  // ---------- Mover áreas no organograma ----------
+  async function moverArea(nome, pai) {
+    try {
+      await moveOrgNode(nome, pai);
+      // Atualiza o estado local antes de sincronizar: o desenho responde já.
+      state.organograma = [
+        ...state.organograma.filter((l) => l.nome !== nome),
+        { nome, pai: pai === ORG_RAIZ ? "" : pai, ordem: 0 }
+      ];
+      renderOrganograma(state.employees, state.organograma, state.podeEditar);
+      Toast.success(pai && pai !== ORG_RAIZ
+        ? `${nome} agora responde a ${pai}.`
+        : `${nome} voltou para o topo.`);
+      await sync(true);
+    } catch (error) {
+      Toast.error(friendlyMessage(error));
+      await sync(true);
+    }
+  }
+
+  /** Alternativa ao arrastar, que não funciona bem em telas de toque. */
+  function openMoverArea(nome) {
+    const { raizes } = montarOrganograma(state.employees, state.organograma);
+
+    // Descendentes não podem virar pai: seria um círculo.
+    const proibidos = new Set([nome]);
+    (function marcar(nos) {
+      nos.forEach((no) => {
+        if (proibidos.has(no.nome)) {
+          (function todos(n) { proibidos.add(n.nome); n.filhos.forEach(todos); })(no);
+        }
+        marcar(no.filhos);
+      });
+    })(raizes);
+
+    const opcoes = [];
+    (function listar(nos, nivel) {
+      nos.forEach((no) => {
+        if (!proibidos.has(no.nome)) {
+          opcoes.push({ nome: no.nome, nivel });
+        }
+        listar(no.filhos, nivel + 1);
+      });
+    })(raizes, 0);
+
+    const paiAtual = (state.organograma.find((l) => l.nome === nome) || {}).pai || "";
+
+    Modal.open({
+      title: "Mover área",
+      subtitle: nome,
+      size: "sm",
+      body: `
+      <form class="form-grid" id="orgForm" novalidate>
+        <div class="field span-2">
+          <label class="field__label" for="org-pai">Responde a</label>
+          <select id="org-pai" name="pai">
+            <option value="" ${paiAtual ? "" : "selected"}>${escapeHtml(ORG_RAIZ)} (topo)</option>
+            ${opcoes.map((o) => `<option value="${escapeHtml(o.nome)}" ${o.nome === paiAtual ? "selected" : ""}>
+              ${"— ".repeat(o.nivel)}${escapeHtml(o.nome)}</option>`).join("")}
+          </select>
+          <span class="field__hint">As subáreas desta área não aparecem na lista: colocá-la abaixo de uma delas criaria um círculo.</span>
+        </div>
+      </form>`,
+      footer: `
+      <button class="btn btn--ghost" data-close>Cancelar</button>
+      <span class="spacer"></span>
+      <button class="btn btn--primary" id="orgSalvar">${icon("check", 15)} Mover</button>`,
+      onMount: (container) => {
+        container.querySelector("#orgSalvar").addEventListener("click", async (event) => {
+          const destino = container.querySelector("#org-pai").value;
+          const botao = event.currentTarget;
+          botao.disabled = true;
+          botao.innerHTML = '<span class="spinner"></span> Movendo…';
+          Modal.close();
+          await moverArea(nome, destino);
+        });
+      }
+    });
+  }
+
+  function ligarArrastarOrganograma() {
+    const container = document.getElementById("orgChart");
+    if (!container) return;
+    let arrastando = null;      // nome da área
+    let ramoArrastado = null;    // o ramo inteiro, com as subáreas dentro
+
+    const limpar = () => {
+      arrastando = null;
+      ramoArrastado = null;
+      container.querySelectorAll(".is-dragging, .is-target")
+        .forEach((el) => el.classList.remove("is-dragging", "is-target"));
+    };
+
+    container.addEventListener("dragstart", (event) => {
+      const card = event.target.closest(".org-card--movel");
+      if (!card || !state.podeEditar) { event.preventDefault(); return; }
+      arrastando = card.dataset.orgNode;
+      ramoArrastado = card.closest(".org-branch");
+      card.classList.add("is-dragging");
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", arrastando);
+    });
+
+    container.addEventListener("dragend", limpar);
+
+    /**
+     * O ramo arrastado contém todas as suas subáreas, então basta perguntar se
+     * o alvo está dentro dele — sem seletor exótico e sem repetir a lógica de
+     * hierarquia que já existe na montagem da árvore.
+     */
+    const alvoValido = (card) => {
+      if (!card || !arrastando) return false;
+      if (card.dataset.orgNode === arrastando) return false;
+      if (ramoArrastado && ramoArrastado.contains(card)) return false;
+      return true;
+    };
+
+    container.addEventListener("dragover", (event) => {
+      const card = event.target.closest("[data-org-node]");
+      if (!alvoValido(card)) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+      container.querySelectorAll(".is-target").forEach((el) => el.classList.remove("is-target"));
+      card.classList.add("is-target");
+    });
+
+    container.addEventListener("drop", async (event) => {
+      const card = event.target.closest("[data-org-node]");
+      if (!alvoValido(card)) return;
+      event.preventDefault();
+      const destino = card.dataset.orgNode;
+      const origem = arrastando;
+      limpar();
+      if (origem && destino) await moverArea(origem, destino);
+    });
+
+    container.addEventListener("click", (event) => {
+      const grip = event.target.closest("[data-org-menu]");
+      if (!grip || !state.podeEditar) return;
+      openMoverArea(grip.dataset.orgMenu);
+    });
+  }
+
   // ---------- Exportações ----------
   function exportRows() {
     const filtered = sortEmployees(applyFilters(state.employees, state));
@@ -8838,6 +9310,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     document.getElementById("navBackdrop").addEventListener("click", () => document.body.classList.remove("nav-open"));
     document.getElementById("themeToggle").addEventListener("click", () => Theme.toggle());
     document.getElementById("bellBtn").addEventListener("click", () => openAvisos());
+    ligarArrastarOrganograma();
 
     const userTrigger = document.getElementById("userTrigger");
     const userMenu = document.getElementById("userMenu");
