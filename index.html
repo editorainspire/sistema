@@ -5433,6 +5433,14 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     return state.audiencia.find((c) => String(c.colaborador_id) === String(colaboradorId)) || null;
   }
 
+  /**
+   * Contas ativas sem ficha na equipe. colaborador_id volta a ser nulo sozinho
+   * quando a ficha é excluída, então basta olhar para ele.
+   */
+  function contasSemFicha() {
+    return state.audiencia.filter((conta) => !conta.colaborador_id);
+  }
+
 
   function employeeFormBody(employee = {}, people = [], conta = null) {
     const value = (key) => escapeHtml(employee[key] || "");
