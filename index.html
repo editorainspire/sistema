@@ -2421,6 +2421,117 @@ html[data-theme="dark"] .sync-fab { color: #0B1622; background: var(--secondary)
 .readers__summary strong { font-size: 28px; font-weight: 600; color: var(--primary); letter-spacing: -.03em; }
 .readers__summary span { font-size: 13px; color: var(--text-soft); }
 
+/* ---------- Código de verificação ---------- */
+.code-input {
+  width: 100%;
+  height: 58px;
+  text-align: center;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: .38em;
+  text-indent: .38em;
+  font-variant-numeric: tabular-nums;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--primary);
+  outline: none;
+  transition: border-color var(--fast) var(--ease), box-shadow var(--fast) var(--ease);
+}
+.code-input::placeholder { color: var(--text-mute); letter-spacing: .38em; }
+.code-input:focus { border-color: var(--secondary); box-shadow: 0 0 0 4px var(--secondary-soft); }
+
+.code-sent {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 11px var(--sp-3);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-soft);
+}
+.code-sent svg { width: 15px; height: 15px; flex: none; margin-top: 2px; color: var(--text-mute); }
+.code-sent strong { color: var(--primary); word-break: break-all; }
+
+/* ---------- Comentários ---------- */
+.thread { display: flex; flex-direction: column; gap: var(--sp-3); }
+
+.comment {
+  display: flex;
+  gap: var(--sp-3);
+  padding: var(--sp-3);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+}
+.comment--mine { background: var(--primary-soft); }
+.comment__body { flex: 1; min-width: 0; }
+.comment__head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 3px; flex-wrap: wrap; }
+.comment__name { font-size: 12.5px; font-weight: 600; color: var(--primary); }
+.comment__when { font-size: 11px; color: var(--text-mute); }
+.comment__text { font-size: 13px; line-height: 1.6; color: var(--text); white-space: pre-wrap; word-break: break-word; }
+.comment__del {
+  align-self: flex-start;
+  padding: 4px;
+  border-radius: var(--r-sm);
+  color: var(--text-mute);
+  opacity: 0;
+  transition: all var(--fast) var(--ease);
+}
+.comment__del svg { width: 13px; height: 13px; }
+.comment:hover .comment__del { opacity: 1; }
+.comment__del:hover { background: var(--danger-soft); color: var(--danger); }
+
+.thread__form { display: flex; flex-direction: column; gap: var(--sp-2); margin-top: var(--sp-4); }
+.thread__form textarea { min-height: 76px; }
+.thread__actions { display: flex; align-items: center; gap: var(--sp-3); }
+.thread__count { font-size: 11px; color: var(--text-mute); margin-right: auto; }
+
+.thread__empty {
+  text-align: center;
+  padding: var(--sp-5) var(--sp-4);
+  border: 1px dashed var(--border);
+  border-radius: var(--r-md);
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+@media (max-width: 720px) {
+  .comment__del { opacity: 1; }
+}
+
+/* ---------- Blocos da agenda ---------- */
+.agenda__block { margin-bottom: var(--sp-6); }
+.agenda__block:last-child { margin-bottom: 0; }
+
+.agenda__block-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-4);
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.agenda__block-title {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -.01em;
+  color: var(--primary);
+}
+.agenda__block-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 9px;
+  border-radius: var(--r-full);
+  font-size: 10.5px;
+  font-weight: 600;
+  background: var(--block-soft, var(--surface-2));
+  color: var(--block-color, var(--text-soft));
+}
+.agenda__block-line { flex: 1; height: 1px; }
+
 /* ---------- Série de reuniões ---------- */
 .serie-note {
   display: flex;
@@ -2674,7 +2785,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
       <!-- Recuperar -->
       <form class="auth__pane" data-pane="recover" novalidate>
         <h1>Recuperar senha</h1>
-        <p>Informe seu e-mail. Se houver conta, enviamos um link para você criar uma senha nova.</p>
+        <p>Informe seu e-mail. Se houver conta, enviamos um código de verificação.</p>
 
         <div class="field">
           <label class="field__label" for="recoverEmail">E-mail</label>
@@ -2683,17 +2794,43 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
 
         <div class="auth__msg" id="recoverMsg"></div>
 
-        <button class="btn btn--primary btn--block" id="recoverSubmit" type="submit">Enviar link</button>
+        <button class="btn btn--primary btn--block" id="recoverSubmit" type="submit">Enviar código</button>
 
         <div class="auth__foot">
           <button type="button" data-pane-go="login">Voltar para o login</button>
         </div>
       </form>
 
-      <!-- Nova senha (chegou pelo link do e-mail) -->
+      <!-- Código de verificação -->
+      <form class="auth__pane" data-pane="code" novalidate>
+        <h1>Digite o código</h1>
+        <p>Enviamos um código de 6 dígitos por e-mail. Ele vale por uma hora.</p>
+
+        <div class="code-sent">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 8 10 6 10-6"/></svg>
+          <span>Enviado para <strong id="codeEmail">—</strong></span>
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="codeInput">Código</label>
+          <input id="codeInput" class="code-input" type="text" inputmode="numeric"
+                 autocomplete="one-time-code" maxlength="6" placeholder="000000" required>
+        </div>
+
+        <div class="auth__msg" id="codeMsg"></div>
+
+        <button class="btn btn--primary btn--block" id="codeSubmit" type="submit">Verificar código</button>
+
+        <div class="auth__foot">
+          <button type="button" id="codeResend">Enviar outro código</button>
+          <button type="button" data-pane-go="login">Voltar para o login</button>
+        </div>
+      </form>
+
+      <!-- Nova senha -->
       <form class="auth__pane" data-pane="reset" novalidate>
         <h1>Criar nova senha</h1>
-        <p>Escolha uma senha de pelo menos 8 caracteres.</p>
+        <p>Código confirmado. Escolha uma senha de pelo menos 8 caracteres.</p>
 
         <div class="field">
           <label class="field__label" for="resetSenha">Nova senha</label>
@@ -3890,7 +4027,26 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
       });
     },
 
-    /** Grava a senha nova usando o token que veio no link do e-mail. */
+    /**
+     * Confere o código de 6 dígitos que o Supabase mandou por e-mail. Cada
+     * envio sorteia um código novo e invalida o anterior — quem gera é o
+     * serviço de contas, não o painel.
+     *
+     * Dando certo, devolve uma sessão curta que serve para trocar a senha.
+     */
+    async verificarCodigo(email, codigo) {
+      const dados = await this.pedir("/verify", {
+        body: {
+          type: "recovery",
+          email: String(email).trim().toLowerCase(),
+          token: String(codigo).replace(/\D/g, "")
+        }
+      });
+      if (!dados?.access_token) throw new Error("Código inválido ou expirado.");
+      return dados;
+    },
+
+    /** Grava a senha nova usando o token da recuperação. */
     async definirSenha(novaSenha, token) {
       await this.pedir("/user", { method: "PUT", body: { password: novaSenha }, token });
     },
@@ -4058,11 +4214,18 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
   // ---- Comunicados ----
   async function loadAnnouncements() {
     const items = ((await call("announcements.list")) || [])
-      .map((a) => ({ ...a, areas: normalizeAreas(a.areas), leituras: a.leituras || [] }));
+      .map((a) => ({
+        ...a,
+        areas: normalizeAreas(a.areas),
+        leituras: a.leituras || [],
+        comentarios: a.comentarios || []
+      }));
     return { items };
   }
   const createAnnouncement = (data) => call("announcements.create", data);
   const markNoticeRead = (id) => call("announcements.read", { id });
+  const sendComment = (id, texto) => call("announcements.comment", { id, texto });
+  const removeComment = (id) => call("announcements.commentDelete", { id });
   const loadAudience = async () => ({ items: (await call("announcements.audience")) || [] });
   const updateAnnouncement = (data) => call("announcements.update", data);
   const deleteAnnouncement = (id) => call("announcements.delete", { id });
@@ -4220,7 +4383,9 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     ban: '<circle cx="12" cy="12" r="9"/><path d="m5.6 5.6 12.8 12.8"/>',
     eyeCheck: '<path d="M2.5 12S6 5.5 12 5.5c1.4 0 2.7.35 3.8.9"/><circle cx="12" cy="12" r="2.6"/><path d="m16 18.5 2 2 4-4"/>',
     repeat: '<path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>',
-    envelope: '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 8 10 6 10-6"/><circle cx="19" cy="6" r="3" fill="currentColor" stroke="none"/>'
+    envelope: '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 8 10 6 10-6"/><circle cx="19" cy="6" r="3" fill="currentColor" stroke="none"/>',
+    chat: '<path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9 9 0 0 1-3.9-.9L3 20.5l1.5-4.6A8.4 8.4 0 0 1 3.6 11.5 8.4 8.4 0 0 1 12 3.1a8.4 8.4 0 0 1 9 8.4z"/>',
+    send: '<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/>'
   };
 
   function icon(name, size = 20) {
@@ -4419,7 +4584,15 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
         <span class="read__bar"><span style="width:${pct}%"></span></span>
       </button>`;
 
-    return `<span style="display:flex;gap:6px;flex-wrap:wrap">${proprio}${contador}</span>`;
+    // A conversa só abre depois da leitura: o cartão fechado não vaza conteúdo.
+    const quantos = (announcement.comentarios || []).length;
+    const conversa = meu ? `
+      <button class="read" data-action="notice-comments" data-id="${escapeHtml(announcement.id)}"
+              title="Abrir os comentários">
+        ${icon("chat", 13)} ${quantos ? `${quantos} coment\u00e1rio${quantos === 1 ? "" : "s"}` : "Comentar"}
+      </button>` : "";
+
+    return `<span style="display:flex;gap:6px;flex-wrap:wrap">${proprio}${contador}${conversa}</span>`;
   }
 
   function noticeCard(announcement, index = 0, admin = false, archived = false, total = 0) {
@@ -5273,6 +5446,47 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     </div>`;
   }
 
+  /** Só a lista de comentários — usada na abertura e a cada envio. */
+  function threadHTML(announcement, meuId, podeModerar) {
+    const lista = announcement.comentarios || [];
+
+    const linha = (c) => {
+      const meu = String(c.perfil_id) === String(meuId);
+      const podeApagar = meu || podeModerar;
+      return `
+      <div class="comment ${meu ? "comment--mine" : ""}" data-comment="${escapeHtml(c.id)}">
+        <div class="avatar avatar--xs" style="--status-color:${meu ? "var(--primary)" : "var(--text-mute)"}">${initials(c.nome || c.email)}</div>
+        <div class="comment__body">
+          <div class="comment__head">
+            <span class="comment__name">${escapeHtml(c.nome || c.email || "—")}${meu ? " (você)" : ""}</span>
+            <span class="comment__when">${escapeHtml(formatDateTime(c.criado_em))}</span>
+          </div>
+          <div class="comment__text">${escapeHtml(c.texto)}</div>
+        </div>
+        ${podeApagar
+          ? `<button class="comment__del" data-del-comment="${escapeHtml(c.id)}" title="Apagar comentário">${icon("trash", 13)}</button>`
+          : ""}
+      </div>`;
+    };
+
+    return lista.length
+      ? lista.map(linha).join("")
+      : '<div class="thread__empty">Nenhum comentário ainda. Comece a conversa.</div>';
+  }
+
+  function commentsBody(announcement, meuId, podeModerar) {
+    return `
+    <div class="thread" id="thread">${threadHTML(announcement, meuId, podeModerar)}</div>
+
+    <div class="thread__form">
+      <textarea id="commentText" placeholder="Escreva um comentário…" maxlength="2000"></textarea>
+      <div class="thread__actions">
+        <span class="thread__count" id="commentCount">0 / 2000</span>
+        <button class="btn btn--primary btn--sm" id="commentSend">${icon("send", 14)} Enviar</button>
+      </div>
+    </div>`;
+  }
+
   function readersBody(announcement, audiencia) {
     const leram = announcement.leituras || [];
     const vistos = new Set(leram.map((l) => String(l.perfil_id)));
@@ -6057,23 +6271,54 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     grid.innerHTML = list.map((link, index) => linkCard(link, index, admin)).join("");
   }
 
+  /**
+   * Divide a agenda em blocos por proximidade. Antes era só "próximas" e
+   * "já aconteceram", e a semana toda virava uma parede única de reuniões.
+   */
+  function blocosDaAgenda(meetings) {
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+
+    const amanha = new Date(hoje);
+    amanha.setDate(amanha.getDate() + 1);
+
+    // Fim da semana corrente: domingo. Segunda-feira devolve os 6 dias seguintes.
+    const fimDaSemana = new Date(hoje);
+    const diasAteDomingo = (7 - hoje.getDay()) % 7;
+    fimDaSemana.setDate(fimDaSemana.getDate() + diasAteDomingo);
+
+    const baldes = {
+      hoje: [], amanha: [], semana: [], adiante: [], passado: []
+    };
+
+    meetings.forEach((meeting) => {
+      const dia = parseDate(meeting.data);
+      if (!dia) return;
+      dia.setHours(0, 0, 0, 0);
+
+      if (dia < hoje) baldes.passado.push(meeting);
+      else if (dia.getTime() === hoje.getTime()) baldes.hoje.push(meeting);
+      else if (dia.getTime() === amanha.getTime()) baldes.amanha.push(meeting);
+      else if (dia <= fimDaSemana) baldes.semana.push(meeting);
+      else baldes.adiante.push(meeting);
+    });
+
+    return [
+      { chave: "hoje",    titulo: "Hoje",            cor: "var(--success)",   soft: "var(--success-soft)",   itens: baldes.hoje },
+      { chave: "amanha",  titulo: "Amanhã",          cor: "var(--info)",      soft: "var(--info-soft)",      itens: baldes.amanha },
+      { chave: "semana",  titulo: "Ainda esta semana", cor: "var(--secondary)", soft: "var(--secondary-soft)", itens: baldes.semana },
+      { chave: "adiante", titulo: "Mais adiante",    cor: "var(--purple)",    soft: "var(--purple-soft)",    itens: baldes.adiante },
+      { chave: "passado", titulo: "Já aconteceram",  cor: "var(--text-mute)", soft: "var(--gray)",           itens: baldes.passado, passado: true }
+    ].filter((bloco) => bloco.itens.length);
+  }
+
   function renderAgenda(meetings, employees, admin) {
     const container = document.getElementById("agenda");
     if (!container) return;
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const blocos = blocosDaAgenda(meetings);
 
-    const future = [];
-    const past = [];
-    meetings.forEach((meeting) => {
-      const day = parseDate(meeting.data);
-      if (!day) return;
-      day.setHours(0, 0, 0, 0);
-      (day >= today ? future : past).push(meeting);
-    });
-
-    if (!future.length && !past.length) {
+    if (!blocos.length) {
       container.innerHTML = emptyState({
         title: "Nenhuma reunião agendada",
         text: "Marque a primeira e o painel avisa quem já tem compromisso no horário.",
@@ -6083,45 +6328,32 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
       return;
     }
 
-    const bloco = (list, past = false) => groupMeetingsByDay(list).map(([isoDay, items]) => `
-    <div class="agenda__day ${past ? "is-past" : ""}">
-      <div class="agenda__date">
-        <span class="agenda__label">${escapeHtml(agendaDayLabel(isoDay))}</span>
-        <span class="agenda__count">${items.length} reuni${items.length === 1 ? "ão" : "ões"}</span>
-      </div>
-      <div class="agenda__items">
-        ${items.map((meeting) => meetingRow(meeting, employees, admin)).join("")}
-      </div>
-    </div>`).join("");
+    const diasDoBloco = (bloco) => {
+      const dias = groupMeetingsByDay(bloco.itens);
+      // No passado, o mais recente primeiro; no futuro, o mais próximo primeiro.
+      if (bloco.passado) dias.reverse();
 
-    let html = "";
-    if (future.length) {
-      html += `<section class="agenda__section">
-        <span class="eyebrow" style="display:block;margin-bottom:16px">Próximas</span>
-        ${bloco(future)}
-      </section>`;
-    }
-    if (past.length) {
-      const ordered = groupMeetingsByDay(past).reverse().map(([isoDay]) => isoDay);
-      const map = new Map(groupMeetingsByDay(past));
-      html += `<section class="agenda__section">
-        <span class="eyebrow" style="display:block;margin-bottom:16px">Já aconteceram · ${past.length}</span>
-        ${ordered.map((isoDay) => {
-          const items = map.get(isoDay) || [];
-          return `
-          <div class="agenda__day is-past">
-            <div class="agenda__date">
-              <span class="agenda__label">${escapeHtml(agendaDayLabel(isoDay))}</span>
-              <span class="agenda__count">${items.length} reuni${items.length === 1 ? "ão" : "ões"}</span>
-            </div>
-            <div class="agenda__items">
-              ${items.map((meeting) => meetingRow(meeting, employees, admin)).join("")}
-            </div>
-          </div>`;
-        }).join("")}
-      </section>`;
-    }
-    container.innerHTML = html;
+      return dias.map(([isoDia, itens]) => `
+      <div class="agenda__day ${bloco.passado ? "is-past" : ""}">
+        <div class="agenda__date">
+          <span class="agenda__label">${escapeHtml(agendaDayLabel(isoDia))}</span>
+          <span class="agenda__count">${itens.length} reuni${itens.length === 1 ? "ão" : "ões"}</span>
+        </div>
+        <div class="agenda__items">
+          ${itens.map((meeting) => meetingRow(meeting, employees, admin)).join("")}
+        </div>
+      </div>`).join("");
+    };
+
+    container.innerHTML = blocos.map((bloco) => `
+    <section class="agenda__block">
+      <div class="agenda__block-head" style="--block-color:${bloco.cor};--block-soft:${bloco.soft}">
+        <span class="agenda__block-title">${escapeHtml(bloco.titulo)}</span>
+        <span class="agenda__block-tag">${bloco.itens.length}</span>
+        <span class="agenda__block-line"></span>
+      </div>
+      ${diasDoBloco(bloco)}
+    </section>`).join("");
   }
 
   function renderMeetingStrip(meetings) {
@@ -6172,7 +6404,8 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     linkFilter: "",
     filters: { departamento: "", equipe: "", cargo: "", responsavel: "" },
     loading: true,
-    tokenRecuperacao: null
+    tokenRecuperacao: null,
+    emailRecuperacao: ""
   };
 
   const PAPEL_LABEL = { admin: "Administrador", editor: "Editor", leitor: "Leitor" };
@@ -6221,7 +6454,11 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
   function bindAuthScreen() {
     document.querySelectorAll("[data-pane-go]").forEach((botao) => {
       botao.addEventListener("click", () => {
-        ["loginMsg", "recoverMsg", "resetMsg"].forEach((id) => aviso(id, ""));
+        ["loginMsg", "recoverMsg", "codeMsg", "resetMsg", "signupMsg"].forEach((id) => aviso(id, ""));
+        if (botao.dataset.paneGo === "login") {
+          state.tokenRecuperacao = null;
+          state.emailRecuperacao = "";
+        }
         mostrarPainel(botao.dataset.paneGo);
       });
     });
@@ -6256,12 +6493,70 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
       ocupar(botao, true);
       try {
         await Auth.recuperar(email);
-        // A resposta é a mesma exista ou não a conta — não revelamos quem tem cadastro.
-        aviso("recoverMsg", "Se houver uma conta com esse e-mail, o link chega em instantes. Confira também o spam.", "ok");
+        // A resposta é a mesma exista ou não a conta — não revelamos quem tem
+        // cadastro. Quem digitou um e-mail sem conta simplesmente não recebe nada.
+        state.emailRecuperacao = email;
+        el("codeEmail").textContent = email;
+        el("codeInput").value = "";
+        aviso("codeMsg", "");
+        mostrarPainel("code");
+        setTimeout(() => el("codeInput").focus(), 200);
       } catch (error) {
         aviso("recoverMsg", error.message);
       } finally {
-        ocupar(botao, false, "Enviar link");
+        ocupar(botao, false, "Enviar código");
+      }
+    });
+
+    // ---- Verificação do código ----
+    const campoCodigo = el("codeInput");
+    campoCodigo?.addEventListener("input", () => {
+      campoCodigo.value = campoCodigo.value.replace(/\D/g, "").slice(0, 6);
+      aviso("codeMsg", "");
+    });
+
+    document.querySelector('[data-pane="code"]').addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const botao = el("codeSubmit");
+      const codigo = campoCodigo.value.replace(/\D/g, "");
+
+      if (codigo.length !== 6) { aviso("codeMsg", "O código tem 6 dígitos."); return; }
+
+      aviso("codeMsg", "");
+      ocupar(botao, true);
+      try {
+        const sessao = await Auth.verificarCodigo(state.emailRecuperacao, codigo);
+        state.tokenRecuperacao = sessao.access_token;
+        el("resetSenha").value = "";
+        el("resetSenha2").value = "";
+        el("resetMeter").dataset.level = "0";
+        aviso("resetMsg", "");
+        mostrarPainel("reset");
+        setTimeout(() => el("resetSenha").focus(), 200);
+      } catch (error) {
+        aviso("codeMsg", error.message);
+        campoCodigo.select();
+      } finally {
+        ocupar(botao, false, "Verificar código");
+      }
+    });
+
+    el("codeResend")?.addEventListener("click", async (event) => {
+      const botao = event.currentTarget;
+      if (!state.emailRecuperacao) { mostrarPainel("recover"); return; }
+
+      botao.disabled = true;
+      const rotulo = botao.textContent;
+      botao.textContent = "Enviando…";
+      try {
+        await Auth.recuperar(state.emailRecuperacao);
+        el("codeInput").value = "";
+        aviso("codeMsg", "Código novo enviado. O anterior deixou de valer.", "ok");
+      } catch (error) {
+        aviso("codeMsg", error.message);
+      } finally {
+        botao.disabled = false;
+        botao.textContent = rotulo;
       }
     });
 
@@ -6279,6 +6574,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
       try {
         await Auth.definirSenha(senha, state.tokenRecuperacao);
         state.tokenRecuperacao = null;
+        state.emailRecuperacao = "";
         el("resetSenha").value = "";
         el("resetSenha2").value = "";
         mostrarPainel("login");
@@ -6833,7 +7129,10 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
       travado,
       body: noticeReaderBody(announcement, jaLido),
       footer: jaLido
-        ? `<button class="btn btn--ghost btn--block" id="readerNext">${ultimo ? "Fechar" : "Próximo"}</button>`
+        ? `
+        <button class="btn btn--ghost" id="readerComment">${icon("chat", 15)} Comentar</button>
+        <span class="spacer"></span>
+        <button class="btn btn--ghost" id="readerNext">${ultimo ? "Fechar" : "Próximo"}</button>`
         : `
         <button class="btn btn--ghost" id="readerLater">${travado ? "Ver depois" : "Fechar sem confirmar"}</button>
         <span class="spacer"></span>
@@ -6841,6 +7140,10 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
         <button class="btn btn--primary" id="readerConfirm">${icon("check", 15)} Li e confirmo</button>`,
       onMount: (container) => {
         container.querySelector("#readerNext")?.addEventListener("click", avancar);
+        container.querySelector("#readerComment")?.addEventListener("click", () => {
+          Modal.close();
+          setTimeout(() => openComments(announcement.id), 280);
+        });
         container.querySelector("#readerLater")?.addEventListener("click", () => {
           Modal.close();
           render();
@@ -6860,6 +7163,93 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
             button.innerHTML = `${icon("check", 15)} Li e confirmo`;
           }
         });
+      }
+    });
+  }
+
+  function openComments(id) {
+    const announcement = state.announcements.find((item) => String(item.id) === String(id));
+    if (!announcement) return;
+
+    const meuId = state.perfil?.id;
+    const podeModerar = state.podeEditar;
+
+    const redesenhar = (container) => {
+      const thread = container.querySelector("#thread");
+      thread.innerHTML = threadHTML(announcement, meuId, podeModerar);
+      ligar(container);
+      thread.scrollTop = thread.scrollHeight;
+    };
+
+    const ligar = (container) => {
+      container.querySelectorAll("[data-del-comment]").forEach((botao) => {
+        botao.addEventListener("click", async () => {
+          const alvo = botao.dataset.delComment;
+          const ok = await Modal.confirm({
+            title: "Apagar comentário",
+            text: "O comentário sai da conversa para todo mundo.",
+            confirmLabel: "Apagar"
+          });
+          if (!ok) { openComments(id); return; }
+          try {
+            await removeComment(alvo);
+            announcement.comentarios = (announcement.comentarios || [])
+              .filter((c) => String(c.id) !== String(alvo));
+            openComments(id);
+            render();
+          } catch (error) {
+            Toast.error(friendlyMessage(error));
+            openComments(id);
+          }
+        });
+      });
+    };
+
+    Modal.open({
+      title: "Comentários",
+      subtitle: announcement.titulo,
+      size: "lg",
+      body: commentsBody(announcement, meuId, podeModerar),
+      footer: `<button class="btn btn--ghost btn--block" data-close>Fechar</button>`,
+      onMount: (container) => {
+        ligar(container);
+
+        const campo = container.querySelector("#commentText");
+        const contador = container.querySelector("#commentCount");
+        const enviar = container.querySelector("#commentSend");
+
+        campo.addEventListener("input", () => {
+          contador.textContent = `${campo.value.length} / 2000`;
+        });
+
+        // Ctrl+Enter envia — quem escreve muito não precisa procurar o botão.
+        campo.addEventListener("keydown", (event) => {
+          if ((event.ctrlKey || event.metaKey) && event.key === "Enter") enviar.click();
+        });
+
+        enviar.addEventListener("click", async () => {
+          const texto = campo.value.trim();
+          if (!texto) { Toast.warning("Escreva alguma coisa antes de enviar."); return; }
+
+          enviar.disabled = true;
+          enviar.innerHTML = '<span class="spinner"></span> Enviando…';
+          try {
+            const novo = await sendComment(id, texto);
+            announcement.comentarios = [...(announcement.comentarios || []), novo];
+            campo.value = "";
+            contador.textContent = "0 / 2000";
+            redesenhar(container);
+            render();
+          } catch (error) {
+            Toast.error(friendlyMessage(error));
+          } finally {
+            enviar.disabled = false;
+            enviar.innerHTML = `${icon("send", 14)} Enviar`;
+          }
+        });
+
+        const thread = container.querySelector("#thread");
+        thread.scrollTop = thread.scrollHeight;
       }
     });
   }
@@ -7697,6 +8087,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
 
         case "new-notice": openNoticeForm(); break;
         case "open-notice": abrirComunicado(id); break;
+        case "notice-comments": openComments(id); break;
         case "notice-readers": openReaders(id); break;
         case "edit-notice": openNoticeForm(state.announcements.find((item) => String(item.id) === String(id))); break;
         case "delete-notice": await removeNotice(id); break;
