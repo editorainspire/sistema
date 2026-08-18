@@ -2472,6 +2472,94 @@ html[data-theme="dark"] .badge--cake { color: var(--secondary); }
   .comment__del { opacity: 1; }
 }
 
+/* ---------- Marcação de pessoas no comentário ---------- */
+.mention {
+  font-weight: 600;
+  color: var(--info);
+  background: var(--info-soft);
+  padding: 1px 5px;
+  border-radius: 5px;
+}
+.mention--me { color: var(--secondary); background: var(--secondary-soft); }
+
+.mention-box { position: relative; }
+
+.mention-list {
+  position: absolute;
+  left: 0; right: 0; bottom: calc(100% + 6px);
+  z-index: 5;
+  max-height: 190px;
+  overflow-y: auto;
+  padding: 5px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-md);
+  display: none;
+}
+.mention-list.is-open { display: block; }
+
+.mention-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 9px;
+  border-radius: var(--r-sm);
+  text-align: left;
+  transition: background var(--fast) var(--ease);
+}
+.mention-item:hover, .mention-item.is-cursor { background: var(--primary-soft); }
+.mention-item__name { font-size: 12.5px; font-weight: 500; color: var(--primary); }
+.mention-item__mail { font-size: 11px; color: var(--text-mute); }
+
+/* ---------- Avisos ---------- */
+.bell { position: relative; }
+.bell__count {
+  position: absolute;
+  top: -3px; right: -3px;
+  min-width: 17px; height: 17px;
+  padding: 0 4px;
+  border-radius: var(--r-full);
+  background: var(--danger);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--bg);
+}
+.bell__count[hidden] { display: none; }
+
+.notif-list { display: flex; flex-direction: column; gap: 8px; }
+
+.notif {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  width: 100%;
+  padding: var(--sp-3);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--notif-color, var(--info));
+  border-radius: var(--r-md);
+  background: var(--card);
+  text-align: left;
+  transition: all var(--fast) var(--ease);
+}
+.notif:hover { background: var(--surface-2); transform: translateX(2px); }
+.notif__icon {
+  width: 32px; height: 32px;
+  border-radius: var(--r-sm);
+  display: grid; place-items: center;
+  background: var(--notif-soft, var(--info-soft));
+  color: var(--notif-color, var(--info));
+  flex: none;
+}
+.notif__body { flex: 1; min-width: 0; }
+.notif__title { font-size: 13px; font-weight: 600; color: var(--primary); }
+.notif__text { font-size: 12px; color: var(--text-soft); line-height: 1.5; margin-top: 2px; }
+.notif__when { font-size: 11px; color: var(--text-mute); margin-top: 3px; }
+
 /* ---------- Escolha da conta ao criar uma ficha ---------- */
 .pick-list { display: flex; flex-direction: column; gap: 8px; }
 
@@ -3057,6 +3145,13 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
           <span class="sync__text">Sincronizando…</span>
         </button>
 
+        <div class="bell">
+          <button class="icon-btn" id="bellBtn" aria-label="Meus avisos" title="Meus avisos">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+          </button>
+          <span class="bell__count" id="bellCount" hidden>0</span>
+        </div>
+
         <button class="icon-btn" id="themeToggle" aria-label="Alternar tema"></button>
 
         <div class="user">
@@ -3570,7 +3665,21 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     const br = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
     if (br) return new Date(+br[3], +br[2] - 1, +br[1]);
 
-    const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    // Timestamp completo do banco. Precisa ser normalizado antes: o Postgres
+    // devolve "2026-08-18 01:23:45+00" — com espaço e fuso sem dois-pontos —
+    // e o Safari recusa esse formato, devolvendo data inválida.
+    const comHora = raw.match(
+      /^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?)\s*(Z|[+-]\d{2}:?\d{2})?$/
+    );
+    if (comHora) {
+      let fuso = comHora[3] || "";
+      if (/^[+-]\d{4}$/.test(fuso)) fuso = fuso.slice(0, 3) + ":" + fuso.slice(3);
+      if (/^[+-]\d{2}$/.test(fuso)) fuso += ":00";
+      const completa = new Date(`${comHora[1]}T${comHora[2]}${fuso}`);
+      if (!isNaN(completa)) return completa;
+    }
+
+    const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
     if (iso) return new Date(+iso[1], +iso[2] - 1, +iso[3]);
 
     const dayMonth = raw.match(/^(\d{2})\/(\d{2})$/);
@@ -4381,8 +4490,11 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
   }
   const createAnnouncement = (data) => call("announcements.create", data);
   const markNoticeRead = (id) => call("announcements.read", { id });
-  const sendComment = (id, texto) => call("announcements.comment", { id, texto });
+  const sendComment = (id, texto, mencoes = []) =>
+    call("announcements.comment", { id, texto, mencoes });
   const removeComment = (id) => call("announcements.commentDelete", { id });
+  const loadNotifications = async () => ({ items: (await call("notifications.list")) || [] });
+  const markNotificationsSeen = (ids = null) => call("notifications.seen", ids ? { ids } : {});
   const loadAudience = async () => ({ items: (await call("announcements.audience")) || [] });
   const updateAnnouncement = (data) => call("announcements.update", data);
   const deleteAnnouncement = (id) => call("announcements.delete", { id });
@@ -4543,7 +4655,9 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     repeat: '<path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>',
     envelope: '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 8 10 6 10-6"/><circle cx="19" cy="6" r="3" fill="currentColor" stroke="none"/>',
     chat: '<path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9 9 0 0 1-3.9-.9L3 20.5l1.5-4.6A8.4 8.4 0 0 1 3.6 11.5 8.4 8.4 0 0 1 12 3.1a8.4 8.4 0 0 1 9 8.4z"/>',
-    send: '<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/>'
+    send: '<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/>',
+    bell: '<path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>',
+    at: '<circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 5.4 1.8A10 10 0 1 0 17 20"/>'
   };
 
   function icon(name, size = 20) {
@@ -4725,8 +4839,10 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
 
     // Confirmado é definitivo: virou um selo, não um botão.
     const proprio = meu
-      ? `<span class="read read--done" title="Registro permanente${minha?.visto_em ? " · " + escapeHtml(formatDateTime(minha.visto_em)) : ""}">
-           ${icon("check", 13)} Você leu${minha?.visto_em ? ` · ${escapeHtml(formatDateShort(minha.visto_em))}` : ""}
+      ? `<span class="read read--done" title="Registro permanente, não muda mais">
+           ${icon("check", 13)} Você leu${minha?.visto_em
+             ? ` · ${escapeHtml(formatDateShort(minha.visto_em))} às ${escapeHtml(formatTime(minha.visto_em))}`
+             : ""}
          </span>`
       : `<button class="read" data-action="open-notice" data-id="${escapeHtml(announcement.id)}">
            ${icon("eyeCheck", 13)} Ler e confirmar
@@ -5713,6 +5829,41 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     </div>`;
   }
 
+  /**
+   * Realça os "@Nome" que correspondem a pessoas realmente marcadas. Trabalha
+   * sobre o texto já escapado, para nunca injetar HTML do comentário.
+   */
+  function realcarMencoes(texto, mencoes = [], meuId = null) {
+    let html = escapeHtml(texto);
+    const ids = (mencoes || []).map(String);
+    if (!ids.length) return html;
+
+    // Nomes mais longos primeiro: "Maria Eduarda" antes de "Maria".
+    const marcados = state.audiencia
+      .filter((c) => ids.includes(String(c.id)))
+      .sort((a, b) => (b.nome || "").length - (a.nome || "").length);
+
+    // Mesmo cuidado do reconhecimento: troca por um marcador temporário para o
+    // nome curto não casar dentro do longo que já foi realçado.
+    const guardados = [];
+    marcados.forEach((pessoa) => {
+      const nome = (pessoa.nome || "").trim();
+      if (!nome) return;
+      const alvo = "@" + escapeHtml(nome);
+      if (!html.includes(alvo)) return;
+      const eu = String(pessoa.id) === String(meuId);
+      const chave = `\u0000M${guardados.length}\u0000`;
+      guardados.push(`<span class="mention ${eu ? "mention--me" : ""}">${alvo}</span>`);
+      html = html.split(alvo).join(chave);
+    });
+
+    guardados.forEach((trecho, i) => {
+      html = html.split(`\u0000M${i}\u0000`).join(trecho);
+    });
+
+    return html;
+  }
+
   /** Só a lista de comentários — usada na abertura e a cada envio. */
   function threadHTML(announcement, meuId, podeModerar) {
     const lista = announcement.comentarios || [];
@@ -5728,7 +5879,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
             <span class="comment__name">${escapeHtml(c.nome || c.email || "—")}${meu ? " (você)" : ""}</span>
             <span class="comment__when">${escapeHtml(formatDateTime(c.criado_em))}</span>
           </div>
-          <div class="comment__text">${escapeHtml(c.texto)}</div>
+          <div class="comment__text">${realcarMencoes(c.texto, c.mencoes, meuId)}</div>
         </div>
         ${podeApagar
           ? `<button class="comment__del" data-del-comment="${escapeHtml(c.id)}" title="Apagar comentário">${icon("trash", 13)}</button>`
@@ -5746,7 +5897,10 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     <div class="thread" id="thread">${threadHTML(announcement, meuId, podeModerar)}</div>
 
     <div class="thread__form">
-      <textarea id="commentText" placeholder="Escreva um comentário…" maxlength="2000"></textarea>
+      <div class="mention-box">
+        <div class="mention-list" id="mentionList"></div>
+        <textarea id="commentText" placeholder="Escreva um comentário…  digite @ para marcar alguém" maxlength="2000"></textarea>
+      </div>
       <div class="thread__actions">
         <span class="thread__count" id="commentCount">0 / 2000</span>
         <button class="btn btn--primary btn--sm" id="commentSend">${icon("send", 14)} Enviar</button>
@@ -6759,7 +6913,8 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     dadosIniciais: null,
     usuariosEm: 0,
     agendaTab: "",
-    seriesAbertas: new Set()
+    seriesAbertas: new Set(),
+    avisos: []
   };
 
   const PAPEL_LABEL = { admin: "Administrador", editor: "Editor", leitor: "Leitor" };
@@ -7003,7 +7158,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
       // Perfil e dados na mesma requisição: o login abre o painel de uma vez.
       const { resultado } = await loadPainel([
         "users.me", "employees.list", "announcements.list", "announcements.audience",
-        "categories.list", "links.list", "meetings.list"
+        "categories.list", "links.list", "meetings.list", "notifications.list"
       ]);
       state.perfil = resultado["users.me"];
       if (!state.perfil) throw new ApiError(FRIENDLY.auth, { code: "auth" });
@@ -7043,6 +7198,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
       processVacationReturns();
     }
     mostrarPendentesDeLeitura();
+    mostrarAvisosPendentes();
   }
 
   async function sairDoApp() {
@@ -7071,7 +7227,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     try {
       const acoes = [
         "employees.list", "announcements.list", "announcements.audience",
-        "categories.list", "links.list", "meetings.list"
+        "categories.list", "links.list", "meetings.list", "notifications.list"
       ];
       if (state.isAdmin) acoes.push("users.list");
 
@@ -7103,6 +7259,10 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     if (resultado["categories.list"]) setCategories(resultado["categories.list"]);
     if (resultado["links.list"]) state.links = resultado["links.list"];
     if (resultado["meetings.list"]) state.meetings = resultado["meetings.list"];
+    if (resultado["notifications.list"]) {
+      state.avisos = resultado["notifications.list"];
+      atualizarSino();
+    }
     if (resultado["users.list"]) {
       state.users = resultado["users.list"];
       state.usuariosEm = Date.now();
@@ -7540,14 +7700,17 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
   /** Grava a confirmação e reflete no estado local. Sem volta. */
   async function confirmarLeitura(announcement) {
     const resposta = await markNoticeRead(announcement.id);
+    // O horário devolvido é o que ficou gravado — e é o que a tela mostra.
+    const em = resposta?.visto_em || new Date().toISOString();
     announcement.leituras = [...(announcement.leituras || []), {
       perfil_id: state.perfil.id,
       nome: state.perfil.nome,
       email: state.perfil.email,
-      visto_em: resposta?.visto_em || new Date().toISOString(),
+      visto_em: em,
       souEu: true
     }];
     announcement.vistoPorMim = true;
+    return em;
   }
 
   /**
@@ -7603,14 +7766,217 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
           button.disabled = true;
           button.innerHTML = '<span class="spinner"></span> Registrando…';
           try {
-            await confirmarLeitura(announcement);
+            const em = await confirmarLeitura(announcement);
             avancar();
-            if (ultimo) Toast.success("Leitura registrada.");
+            if (ultimo) Toast.success(`Leitura registrada às ${formatTime(em)}.`);
           } catch (error) {
             Toast.error(friendlyMessage(error));
             button.disabled = false;
             button.innerHTML = `${icon("check", 15)} Li e confirmo`;
           }
+        });
+      }
+    });
+  }
+
+  /**
+   * Quem foi marcado, deduzido do próprio texto. Nada de lista paralela: se a
+   * pessoa apagar o "@Nome" depois de escolher, a marcação vai embora com ele.
+   */
+  function mencoesNoTexto(texto) {
+    const ids = [];
+    // Do nome mais longo para o mais curto, apagando o que já casou: sem isso,
+    // "@Maria Eduarda Amadei" marcaria também a conta "Maria".
+    let restante = String(texto || "");
+
+    [...state.audiencia]
+      .sort((a, b) => (b.nome || "").length - (a.nome || "").length)
+      .forEach((pessoa) => {
+        const nome = (pessoa.nome || "").trim();
+        if (!nome) return;
+        const alvo = "@" + nome;
+        if (!restante.includes(alvo)) return;
+        restante = restante.split(alvo).join(" ");
+        if (!ids.includes(pessoa.id)) ids.push(pessoa.id);
+      });
+
+    return ids;
+  }
+
+  /** Autocompletar do "@" dentro do campo de comentário. */
+  function ligarMencoes(container) {
+    const campo = container.querySelector("#commentText");
+    const lista = container.querySelector("#mentionList");
+    if (!campo || !lista) return;
+
+    let candidatos = [];
+    let destaque = 0;
+    let inicioDoTermo = -1;
+
+    const fechar = () => {
+      lista.classList.remove("is-open");
+      lista.innerHTML = "";
+      candidatos = [];
+      inicioDoTermo = -1;
+    };
+
+    const desenhar = () => {
+      if (!candidatos.length) { fechar(); return; }
+      lista.innerHTML = candidatos.map((pessoa, i) => `
+        <button type="button" class="mention-item ${i === destaque ? "is-on" : ""}" data-mention="${escapeHtml(pessoa.id)}">
+          <span class="avatar avatar--xs" style="--status-color:var(--primary)">${initials(pessoa.nome || pessoa.email)}</span>
+          <span class="mention-item__body">
+            <span class="mention-item__name">${escapeHtml(pessoa.nome || "Sem nome")}</span>
+            <span class="mention-item__mail">${escapeHtml(pessoa.email)}</span>
+          </span>
+        </button>`).join("");
+      lista.classList.add("is-open");
+    };
+
+    const inserir = (pessoa) => {
+      if (inicioDoTermo < 0) return;
+      const antes = campo.value.slice(0, inicioDoTermo);
+      const depois = campo.value.slice(campo.selectionStart);
+      const nome = (pessoa.nome || "").trim();
+      campo.value = `${antes}@${nome} ${depois}`;
+      const posicao = (antes + "@" + nome + " ").length;
+      campo.setSelectionRange(posicao, posicao);
+      fechar();
+      campo.focus();
+      campo.dispatchEvent(new Event("input", { bubbles: true }));
+    };
+
+    const procurar = () => {
+      const caret = campo.selectionStart;
+      const antes = campo.value.slice(0, caret);
+      // O "@" tem que iniciar palavra, e o termo não passa de duas palavras —
+      // senão qualquer arroba no meio de um e-mail abriria a lista.
+      const m = antes.match(/(?:^|\s)@([\p{L}\p{M}'.\-]*(?:\s[\p{L}\p{M}'.\-]*)?)$/u);
+      if (!m) { fechar(); return; }
+
+      inicioDoTermo = caret - m[1].length - 1;
+      const termo = slugify(m[1].trim());
+
+      candidatos = state.audiencia
+        .filter((pessoa) => pessoa.nome && (!termo || slugify(pessoa.nome).includes(termo)))
+        .slice(0, 6);
+      destaque = 0;
+      desenhar();
+    };
+
+    campo.addEventListener("input", procurar);
+    campo.addEventListener("click", procurar);
+
+    campo.addEventListener("keydown", (event) => {
+      if (!candidatos.length) return;
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        destaque = (destaque + 1) % candidatos.length;
+        desenhar();
+      } else if (event.key === "ArrowUp") {
+        event.preventDefault();
+        destaque = (destaque - 1 + candidatos.length) % candidatos.length;
+        desenhar();
+      } else if (event.key === "Enter" || event.key === "Tab") {
+        event.preventDefault();
+        inserir(candidatos[destaque]);
+      } else if (event.key === "Escape") {
+        event.preventDefault();
+        fechar();
+      }
+    });
+
+    lista.addEventListener("mousedown", (event) => {
+      const item = event.target.closest("[data-mention]");
+      if (!item) return;
+      event.preventDefault();
+      const pessoa = candidatos.find((c) => String(c.id) === item.dataset.mention);
+      if (pessoa) inserir(pessoa);
+    });
+
+    campo.addEventListener("blur", () => setTimeout(fechar, 120));
+  }
+
+  // ---------- Avisos ----------
+  function atualizarSino() {
+    const selo = document.getElementById("bellCount");
+    if (!selo) return;
+    const quantos = state.avisos.length;
+    selo.textContent = quantos > 9 ? "9+" : String(quantos);
+    selo.hidden = quantos === 0;
+  }
+
+  const AVISO_ICONE = { mencao: "chat", reuniao: "calendar" };
+
+  function avisosBody() {
+    if (!state.avisos.length) {
+      return `
+      <div class="empty" style="border:0;padding:var(--sp-6) var(--sp-4)">
+        <div class="empty__icon">${icon("check", 24)}</div>
+        <h3>Nada pendente</h3>
+        <p>Quando alguém marcar você num comentário ou incluir você numa reunião, o aviso aparece aqui.</p>
+      </div>`;
+    }
+
+    return `
+    <div class="thread">
+      ${state.avisos.map((aviso) => `
+      <button class="comment" style="width:100%;text-align:left" data-aviso="${escapeHtml(aviso.id)}"
+              data-destino="${escapeHtml(aviso.destino || "")}">
+        <div class="avatar avatar--xs" style="--status-color:${aviso.tipo === "reuniao" ? "var(--info)" : "var(--secondary)"}">
+          ${icon(AVISO_ICONE[aviso.tipo] || "info", 13)}
+        </div>
+        <div class="comment__body">
+          <div class="comment__head">
+            <span class="comment__name">${escapeHtml(aviso.titulo)}</span>
+            <span class="comment__when">${escapeHtml(formatDateTime(aviso.criado_em))}</span>
+          </div>
+          <div class="comment__text">${escapeHtml(aviso.texto)}</div>
+        </div>
+      </button>`).join("")}
+    </div>`;
+  }
+
+  /**
+   * Mostra os avisos pendentes. Fechar dá por vistos: eles não voltam.
+   * Clicar num aviso leva para a tela de onde ele veio.
+   */
+  function openAvisos() {
+    const pendentes = [...state.avisos];
+
+    Modal.open({
+      title: pendentes.length ? `Você tem ${pendentes.length} aviso${pendentes.length === 1 ? "" : "s"}` : "Avisos",
+      subtitle: pendentes.length ? "Clique num aviso para ir até ele" : "",
+      size: "sm",
+      body: avisosBody(),
+      footer: pendentes.length
+        ? `<button class="btn btn--primary btn--block" id="avisosOk">${icon("check", 15)} Entendi, marcar como vistos</button>`
+        : `<button class="btn btn--ghost btn--block" data-close>Fechar</button>`,
+      onMount: (container) => {
+        const darPorVistos = async () => {
+          if (!pendentes.length) return;
+          const ids = pendentes.map((a) => a.id);
+          state.avisos = state.avisos.filter((a) => !ids.includes(a.id));
+          atualizarSino();
+          try { await markNotificationsSeen(ids); } catch { /* volta na próxima carga */ }
+        };
+
+        container.querySelector("#avisosOk")?.addEventListener("click", async (event) => {
+          const botao = event.currentTarget;
+          botao.disabled = true;
+          await darPorVistos();
+          Modal.close();
+        });
+
+        container.querySelectorAll("[data-aviso]").forEach((botao) => {
+          botao.addEventListener("click", async () => {
+            const destino = botao.dataset.destino;
+            await darPorVistos();
+            Modal.close();
+            if (destino === "comunicados" || destino === "reunioes") {
+              setTimeout(() => switchView(destino), 220);
+            }
+          });
         });
       }
     });
@@ -7629,6 +7995,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
       ligar(container);
       thread.scrollTop = thread.scrollHeight;
     };
+
 
     const ligar = (container) => {
       container.querySelectorAll("[data-del-comment]").forEach((botao) => {
@@ -7663,6 +8030,8 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
       onMount: (container) => {
         ligar(container);
 
+        ligarMencoes(container);
+
         const campo = container.querySelector("#commentText");
         const contador = container.querySelector("#commentCount");
         const enviar = container.querySelector("#commentSend");
@@ -7683,7 +8052,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
           enviar.disabled = true;
           enviar.innerHTML = '<span class="spinner"></span> Enviando…';
           try {
-            const novo = await sendComment(id, texto);
+            const novo = await sendComment(id, texto, mencoesNoTexto(texto));
             announcement.comentarios = [...(announcement.comentarios || []), novo];
             campo.value = "";
             contador.textContent = "0 / 2000";
@@ -7713,6 +8082,19 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
    * prioridade alta primeiro. Roda uma vez por sessão.
    */
   let filaJaMostrada = false;
+
+  /** Avisos pendentes viram popup uma vez por sessão, depois dos comunicados. */
+  function mostrarAvisosPendentes() {
+    if (!state.avisos.length) return;
+    setTimeout(() => {
+      // Não atropela um modal já aberto (a fila de comunicados, por exemplo).
+      if (document.querySelector(".modal.is-open")) {
+        setTimeout(mostrarAvisosPendentes, 1200);
+        return;
+      }
+      openAvisos();
+    }, 600);
+  }
 
   function mostrarPendentesDeLeitura() {
     if (filaJaMostrada || !state.perfil) return;
@@ -8250,6 +8632,9 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
             Modal.close();
             Toast.success(`${firstName(conta.nome) || conta.email} já pode entrar como ${PAPEL_LABEL[papel].toLowerCase()}.`);
             await carregarUsuarios(true, true);
+            // Sem isto a conta aprovada não aparecia no seletor de colaborador:
+            // é o sync que recarrega a lista de contas ativas.
+            await sync(true);
           } catch (error) {
             Toast.error(friendlyMessage(error));
             button.disabled = false;
@@ -8273,6 +8658,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
       await rejectUser(id);
       Toast.success("Cadastro recusado.");
       await carregarUsuarios(true, true);
+      await sync(true);
     } catch (error) {
       Toast.error(friendlyMessage(error));
     }
@@ -8290,6 +8676,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
       await deleteUser(id);
       Toast.success("Conta excluída.");
       await carregarUsuarios(true, true);
+      await sync(true);
     } catch (error) {
       Toast.error(friendlyMessage(error));
     }
@@ -8497,6 +8884,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     document.getElementById("menuToggle").addEventListener("click", () => document.body.classList.toggle("nav-open"));
     document.getElementById("navBackdrop").addEventListener("click", () => document.body.classList.remove("nav-open"));
     document.getElementById("themeToggle").addEventListener("click", () => Theme.toggle());
+    document.getElementById("bellBtn").addEventListener("click", () => openAvisos());
 
     const userTrigger = document.getElementById("userTrigger");
     const userMenu = document.getElementById("userMenu");
