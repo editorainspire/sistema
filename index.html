@@ -2472,6 +2472,49 @@ html[data-theme="dark"] .badge--cake { color: var(--secondary); }
   .comment__del { opacity: 1; }
 }
 
+/* ---------- Escolha da conta ao criar uma ficha ---------- */
+.pick-list { display: flex; flex-direction: column; gap: 8px; }
+
+.pick-account {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  width: 100%;
+  padding: 11px var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--card);
+  text-align: left;
+  transition: all var(--fast) var(--ease);
+}
+.pick-account:hover {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  transform: translateX(2px);
+}
+.pick-account__body { flex: 1; min-width: 0; }
+.pick-account__name { font-size: 13.5px; font-weight: 500; color: var(--primary); }
+.pick-account__mail { font-size: 11.5px; color: var(--text-mute); word-break: break-all; }
+.pick-account__go { color: var(--text-mute); flex: none; }
+.pick-account:hover .pick-account__go { color: var(--primary); }
+
+.linked-field {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: 10px var(--sp-3);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.linked-field__body { flex: 1; min-width: 0; }
+.linked-field__label {
+  font-size: 10px; font-weight: 600; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--text-mute);
+}
+.linked-field__value { font-size: 13px; font-weight: 500; color: var(--primary); word-break: break-all; }
+.linked-field svg { color: var(--text-mute); flex: none; }
+
 /* ---------- Abas ---------- */
 .tabs {
   display: flex;
@@ -5224,7 +5267,45 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     </div>`;
   }
 
-  function employeeFormBody(employee = {}, people = []) {
+  /** Contas ativas que ainda não têm ficha na equipe. */
+  function contasSemFicha() {
+    // colaborador_id volta a ser nulo sozinho quando a ficha é excluída,
+    // então basta olhar para ele.
+    return state.audiencia.filter((conta) => !conta.colaborador_id);
+  }
+
+  function accountPickBody(contas) {
+    if (!contas.length) {
+      return `
+      <div class="empty" style="border:0;padding:var(--sp-6) var(--sp-4)">
+        <div class="empty__icon">${icon("lock", 24)}</div>
+        <h3>Nenhuma conta disponível</h3>
+        <p>Todas as contas ativas já têm ficha na equipe. Para cadastrar alguém novo,
+           crie primeiro a conta de acesso — ou aprove um cadastro que esteja esperando.</p>
+        ${state.isAdmin
+          ? '<button class="btn btn--primary" id="pickGoUsers">Ir para Contas de acesso</button>'
+          : '<p class="muted" style="font-size:12.5px">Peça a um administrador para criar a conta.</p>'}
+      </div>`;
+    }
+
+    return `
+    <p class="muted" style="font-size:13px;margin-bottom:16px">
+      A ficha da equipe nasce de uma conta de acesso. Escolha de quem é esta:
+    </p>
+    <div class="pick-list">
+      ${contas.map((conta) => `
+      <button class="pick-account" data-pick-account="${escapeHtml(conta.id)}">
+        <div class="avatar avatar--xs" style="--status-color:var(--primary)">${initials(conta.nome || conta.email)}</div>
+        <div class="pick-account__body">
+          <div class="pick-account__name">${escapeHtml(conta.nome || "Sem nome")}</div>
+          <div class="pick-account__mail">${escapeHtml(conta.email)}</div>
+        </div>
+        <span class="pick-account__go">${icon("external", 15)}</span>
+      </button>`).join("")}
+    </div>`;
+  }
+
+  function employeeFormBody(employee = {}, people = [], conta = null) {
     const value = (key) => escapeHtml(employee[key] || "");
     const statusOptions = STATUS_LIST
       .map((status) => `<option value="${status}" ${employee.status === status ? "selected" : ""}>${status}</option>`).join("");
@@ -5236,11 +5317,25 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     <form class="form-grid" id="employeeForm" novalidate>
       <input type="hidden" name="id" value="${value("id")}">
 
+      ${conta ? `<input type="hidden" name="perfil_id" value="${escapeHtml(conta.id)}">` : ""}
+
       <div class="form-section"><span class="eyebrow">Identificação</span></div>
+
+      ${conta ? `
+      <div class="span-2">
+        <div class="linked-field">
+          ${icon("lock", 16)}
+          <div class="linked-field__body">
+            <span class="linked-field__label">Conta de acesso</span>
+            <span class="linked-field__value">${escapeHtml(conta.email)}</span>
+          </div>
+        </div>
+      </div>` : ""}
 
       <div class="field span-2">
         <label class="field__label" for="f-nome">Nome completo</label>
-        <input id="f-nome" name="nome" value="${value("nome")}" placeholder="Ex.: Marina Alves" required>
+        <input id="f-nome" name="nome" value="${escapeHtml(employee.nome || conta?.nome || "")}" placeholder="Ex.: Marina Alves" required>
+        ${conta ? '<span class="field__hint">Veio da conta de acesso — ajuste se a pessoa usa outro nome no painel.</span>' : ""}
       </div>
 
       <div class="field">
@@ -5284,7 +5379,9 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
       </div>
       <div class="field">
         <label class="field__label" for="f-email">E-mail</label>
-        <input id="f-email" name="email" type="email" value="${value("email")}" placeholder="nome@editorainspire.com.br">
+        <input id="f-email" name="email" type="email" value="${escapeHtml(employee.email || conta?.email || "")}"
+               placeholder="nome@editorainspire.com.br" ${conta || employee.id ? "disabled" : ""}>
+        <span class="field__hint">É o elo com a conta de acesso — muda em Contas de acesso.</span>
       </div>
       <div class="field">
         <label class="field__label" for="f-admissao">Data de admissão</label>
@@ -7129,13 +7226,41 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     });
   }
 
-  function openEmployeeForm(employee = {}) {
+  /** Passo 1 de um cadastro novo: de qual conta é esta ficha? */
+  function openAccountPicker() {
+    const contas = contasSemFicha();
+    Modal.open({
+      title: "Novo colaborador",
+      subtitle: "Escolha a conta de acesso",
+      size: "sm",
+      body: accountPickBody(contas),
+      footer: `<button class="btn btn--ghost btn--block" data-close>Cancelar</button>`,
+      onMount: (container) => {
+        container.querySelector("#pickGoUsers")?.addEventListener("click", () => {
+          Modal.close();
+          switchView("usuarios");
+        });
+
+        container.querySelectorAll("[data-pick-account]").forEach((botao) => {
+          botao.addEventListener("click", () => {
+            const conta = contas.find((c) => String(c.id) === botao.dataset.pickAccount);
+            Modal.close();
+            setTimeout(() => openEmployeeForm({}, conta), 280);
+          });
+        });
+      }
+    });
+  }
+
+  function openEmployeeForm(employee = {}, conta = null) {
     const editing = Boolean(employee.id);
+    // Ficha nova sem conta escolhida: volta um passo.
+    if (!editing && !conta) { openAccountPicker(); return; }
     Modal.open({
       title: editing ? "Editar colaborador" : "Novo colaborador",
-      subtitle: editing ? employee.nome : "Preencha os dados da pessoa",
+      subtitle: editing ? employee.nome : `Ficha de ${conta?.nome || conta?.email || "novo colaborador"}`,
       size: "lg",
-      body: employeeFormBody(employee, state.employees),
+      body: employeeFormBody(employee, state.employees, conta),
       footer: `
       <button class="btn btn--ghost" data-close>Cancelar</button>
       <span class="spacer"></span>
@@ -7147,6 +7272,10 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
         container.querySelector("#saveEmployee").addEventListener("click", async (event) => {
           const data = Modal.formData();
           if (!data.nome) { Toast.warning("O nome é obrigatório."); return; }
+          if (!editing && !conta?.id) {
+            Toast.error("Escolha a conta de acesso da pessoa antes de salvar.");
+            return;
+          }
 
           const button = event.currentTarget;
           button.disabled = true;
@@ -7166,6 +7295,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
               await updateEmployee(data);
             } else {
               data.historico = [{ titulo: "Cadastro criado", status: data.status, data: new Date().toISOString() }];
+              data.perfil_id = conta?.id || "";
               await createEmployee(data);
             }
             Modal.close();
@@ -8132,20 +8262,59 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
         return;
       }
 
-      const employees = rows.map((row) => EmployeeMapper.toModel(row)).filter((employee) => employee.nome);
-      if (!employees.length) { Toast.warning("Nenhuma linha com nome preenchido."); return; }
+      const brutos = rows.map((row) => EmployeeMapper.toModel(row)).filter((employee) => employee.nome);
+      if (!brutos.length) { Toast.warning("Nenhuma linha com nome preenchido."); return; }
+
+      // Cada ficha precisa de uma conta de acesso: o e-mail é o que casa as duas.
+      const disponiveis = new Map(
+        contasSemFicha().map((conta) => [String(conta.email).toLowerCase(), conta])
+      );
+
+      const prontos = [];
+      const semConta = [];
+      for (const pessoa of brutos) {
+        const email = String(pessoa.email || "").trim().toLowerCase();
+        const conta = email ? disponiveis.get(email) : null;
+        if (!conta) { semConta.push(pessoa.nome + (email ? ` (${email})` : " — sem e-mail na planilha")); continue; }
+        prontos.push({ ...pessoa, perfil_id: conta.id });
+        disponiveis.delete(email); // uma conta não vira duas fichas
+      }
+
+      if (!prontos.length) {
+        Modal.open({
+          title: "Nenhuma linha pôde ser importada",
+          size: "sm",
+          body: `
+          <p style="font-size:13px;line-height:1.6;color:var(--text-soft)">
+            Cada colaborador precisa de uma conta de acesso com o mesmo e-mail, e nenhuma
+            das ${brutos.length} linhas casou com uma conta disponível.
+          </p>
+          <p style="font-size:13px;line-height:1.6;color:var(--text-soft);margin-top:12px">
+            Crie as contas em <strong>Contas de acesso</strong> e importe de novo.
+          </p>`,
+          footer: `<button class="btn btn--ghost btn--block" data-close>Entendi</button>`
+        });
+        return;
+      }
+
+      const aviso = semConta.length
+        ? `<br><br><span style="color:var(--warning)">${semConta.length} linha${semConta.length === 1 ? "" : "s"} sem conta de acesso ${semConta.length === 1 ? "será ignorada" : "serão ignoradas"}.</span>`
+        : "";
 
       const ok = await Modal.confirm({
         title: "Importar colaboradores",
-        text: `Encontramos <strong>${employees.length}</strong> pessoa${employees.length === 1 ? "" : "s"} na planilha. Importar agora?`,
+        text: `<strong>${prontos.length}</strong> pessoa${prontos.length === 1 ? "" : "s"} com conta de acesso ${prontos.length === 1 ? "está pronta" : "estão prontas"} para importar.${aviso}`,
         confirmLabel: "Importar",
         danger: false
       });
       if (!ok) return;
 
       Toast.info("Importando…");
-      await importEmployees(employees);
-      Toast.success(`${employees.length} colaboradores importados.`);
+      await importEmployees(prontos);
+      Toast.success(`${prontos.length} colaboradores importados.`);
+      if (semConta.length) {
+        Toast.warning(`Ignorados por falta de conta: ${semConta.slice(0, 3).join(", ")}${semConta.length > 3 ? ` e mais ${semConta.length - 3}` : ""}.`);
+      }
       await sync(true);
     } catch (error) {
       Toast.error(friendlyMessage(error));
