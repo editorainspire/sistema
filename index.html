@@ -3496,21 +3496,47 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     return { color: category.cor, soft: softColor(category.cor), icon: category.icone };
   }
 
-  function normalizeUrl(url = "") {
+  /**
+   * O endereço é guardado exatamente como a pessoa digitou. O https:// entra
+   * só na hora de montar o href — antes ele era gravado no banco e reaparecia
+   * no formulário mesmo depois de apagado.
+   */
+  function hrefDe(url = "") {
     const raw = String(url).trim();
     if (!raw) return "";
-    return /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+    if (/^(https?:|mailto:|tel:)/i.test(raw)) return raw;
+    return `https://${raw}`;
   }
+
+  /** Um endereço só é tratado como web se tiver ponto ou esquema. */
+  function pareceEndereco(url = "") {
+    const raw = String(url).trim();
+    return /^(https?:|mailto:|tel:)/i.test(raw) || /[a-z0-9][^\s]*\.[a-z]{2,}/i.test(raw);
+  }
+
   function domainOf(url = "") {
+    const raw = String(url).trim();
+    if (!raw) return "";
+    // mailto: e tel: não têm domínio para mostrar — vale o destino.
+    const especial = raw.match(/^(mailto|tel):(.+)$/i);
+    if (especial) return especial[2];
+    // Sem cara de endereço, mostra o texto cru: "156151" virava "0.2.97.247"
+    // porque o navegador leu o número como um IP.
+    if (!pareceEndereco(raw)) return raw;
     try {
-      return new URL(normalizeUrl(url)).hostname.replace(/^www\./, "");
+      return new URL(hrefDe(raw)).hostname.replace(/^www\./, "") || raw;
     } catch {
-      return String(url).replace(/^https?:\/\//i, "").split("/")[0];
+      return raw.replace(/^https?:\/\//i, "").split("/")[0];
     }
   }
+
   function faviconOf(url = "") {
-    const domain = domainOf(url);
-    return domain ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64` : "";
+    const raw = String(url).trim();
+    if (/^(mailto|tel):/i.test(raw)) return "";
+    if (!pareceEndereco(raw)) return "";
+    const domain = domainOf(raw);
+    if (!domain || !domain.includes(".")) return "";
+    return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64`;
   }
 
   function escapeHtml(value) {
@@ -4347,6 +4373,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
   const updateEmployee = (data) => call("employees.update", data);
   const deleteEmployee = (id) => call("employees.delete", { id });
   const updateStatus = (id, status, extra = {}) => call("employees.status", { id, status, ...extra });
+  const linkEmployee = (id, perfil_id) => call("employees.link", { id, perfil_id: perfil_id || "" });
 
   // ---- Comunicados ----
   async function loadAnnouncements() {
@@ -4385,6 +4412,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
   const createUser = (data) => call("users.create", data);
   const updateUser = (data) => call("users.update", data);
   const resetUserPassword = (id, senha) => call("users.password", { id, senha });
+  const changeUserEmail = (id, email) => call("users.email", { id, email });
   const deleteUser = (id) => call("users.delete", { id });
   const approveUser = (id, papel, colaborador_id) =>
     call("users.approve", { id, papel, colaborador_id: colaborador_id || null });
@@ -4773,7 +4801,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
 
   function linkCard(link, index = 0, admin = false) {
     const meta = linkMeta(link.categoria);
-    const url = normalizeUrl(link.url);
+    const url = hrefDe(link.url);
     const favicon = faviconOf(link.url);
     return `
     <article class="shortcut" style="--status-color:${meta.color};--status-soft:${meta.soft};animation-delay:${Math.min(index * 40, 320)}ms" data-id="${escapeHtml(link.id)}">
@@ -5030,7 +5058,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
 
         <div class="meet__meta">
           ${meeting.local ? `<span>${icon("mapPin", 13)} ${escapeHtml(meeting.local)}</span>` : ""}
-          ${link ? `<a href="${escapeHtml(normalizeUrl(link))}" target="_blank" rel="noopener">${icon("video", 13)} Entrar na chamada</a>` : ""}
+          ${link ? `<a href="${escapeHtml(hrefDe(link))}" target="_blank" rel="noopener">${icon("video", 13)} Entrar na chamada</a>` : ""}
         </div>
 
         ${ata ? `
@@ -5268,6 +5296,18 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
   }
 
   /** Contas ativas que ainda não têm ficha na equipe. */
+  /** A conta ligada a esta ficha, se houver. */
+  function contaDaFicha(colaboradorId) {
+    return state.audiencia.find((c) => String(c.colaborador_id) === String(colaboradorId)) || null;
+  }
+
+  /** Ficha cuja pessoa tem o mesmo e-mail — usado para sugerir vínculo. */
+  function fichaPorEmail(email) {
+    const alvo = String(email || "").trim().toLowerCase();
+    if (!alvo) return null;
+    return state.employees.find((e) => String(e.email || "").trim().toLowerCase() === alvo) || null;
+  }
+
   function contasSemFicha() {
     // colaborador_id volta a ser nulo sozinho quando a ficha é excluída,
     // então basta olhar para ele.
@@ -5293,15 +5333,26 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
       A ficha da equipe nasce de uma conta de acesso. Escolha de quem é esta:
     </p>
     <div class="pick-list">
-      ${contas.map((conta) => `
-      <button class="pick-account" data-pick-account="${escapeHtml(conta.id)}">
-        <div class="avatar avatar--xs" style="--status-color:var(--primary)">${initials(conta.nome || conta.email)}</div>
-        <div class="pick-account__body">
-          <div class="pick-account__name">${escapeHtml(conta.nome || "Sem nome")}</div>
-          <div class="pick-account__mail">${escapeHtml(conta.email)}</div>
-        </div>
-        <span class="pick-account__go">${icon("external", 15)}</span>
-      </button>`).join("")}
+      ${contas.map((conta) => {
+        // Já existe ficha com esse e-mail? Então é vínculo, não cadastro novo —
+        // criar outra duplicaria a pessoa com foto e histórico em branco.
+        const ficha = fichaPorEmail(conta.email);
+        return `
+        <button class="pick-account" data-pick-account="${escapeHtml(conta.id)}"
+                ${ficha ? `data-pick-link="${escapeHtml(ficha.id)}"` : ""}>
+          <div class="avatar avatar--xs" style="--status-color:${ficha ? "var(--secondary)" : "var(--primary)"}">${initials(conta.nome || conta.email)}</div>
+          <div class="pick-account__body">
+            <div class="pick-account__name">${escapeHtml(conta.nome || "Sem nome")}</div>
+            <div class="pick-account__mail">${escapeHtml(conta.email)}</div>
+            ${ficha
+              ? `<div class="pick-account__mail" style="color:var(--secondary);font-weight:600;margin-top:2px">
+                   Já existe a ficha de ${escapeHtml(ficha.nome)} — vincular a ela
+                 </div>`
+              : ""}
+          </div>
+          <span class="pick-account__go">${icon(ficha ? "link" : "external", 15)}</span>
+        </button>`;
+      }).join("")}
     </div>`;
   }
 
@@ -5317,20 +5368,45 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     <form class="form-grid" id="employeeForm" novalidate>
       <input type="hidden" name="id" value="${value("id")}">
 
-      ${conta ? `<input type="hidden" name="perfil_id" value="${escapeHtml(conta.id)}">` : ""}
+      <div class="form-section"><span class="eyebrow">Conta de acesso</span></div>
+
+      ${(() => {
+        // Ficha nova: a conta já foi escolhida e não muda mais aqui.
+        if (conta) {
+          return `
+          <input type="hidden" name="perfil_id" value="${escapeHtml(conta.id)}">
+          <div class="span-2">
+            <div class="linked-field">
+              ${icon("lock", 16)}
+              <div class="linked-field__body">
+                <span class="linked-field__label">Vinculada a</span>
+                <span class="linked-field__value">${escapeHtml(conta.email)}</span>
+              </div>
+            </div>
+          </div>`;
+        }
+
+        // Ficha existente: dá para trocar ou desfazer o vínculo.
+        const atual = contaDaFicha(employee.id);
+        const opcoes = [...(atual ? [atual] : []), ...contasSemFicha()]
+          .map((c) => `<option value="${escapeHtml(c.id)}" ${atual && c.id === atual.id ? "selected" : ""}>
+                         ${escapeHtml(c.nome || c.email)} — ${escapeHtml(c.email)}
+                       </option>`).join("");
+
+        return `
+        <div class="field span-2">
+          <label class="field__label" for="f-perfil">Conta vinculada</label>
+          <select id="f-perfil" name="perfil_id">
+            <option value="" ${atual ? "" : "selected"}>Sem conta vinculada</option>
+            ${opcoes}
+          </select>
+          <span class="field__hint">${atual
+            ? "O e-mail da ficha vem desta conta. Trocar aqui atualiza os dois."
+            : "Esta ficha ainda não tem login. Vincule uma conta para a pessoa entrar no painel."}</span>
+        </div>`;
+      })()}
 
       <div class="form-section"><span class="eyebrow">Identificação</span></div>
-
-      ${conta ? `
-      <div class="span-2">
-        <div class="linked-field">
-          ${icon("lock", 16)}
-          <div class="linked-field__body">
-            <span class="linked-field__label">Conta de acesso</span>
-            <span class="linked-field__value">${escapeHtml(conta.email)}</span>
-          </div>
-        </div>
-      </div>` : ""}
 
       <div class="field span-2">
         <label class="field__label" for="f-nome">Nome completo</label>
@@ -5377,12 +5453,19 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
         <label class="field__label" for="f-telefone">Telefone</label>
         <input id="f-telefone" name="telefone" value="${value("telefone")}" placeholder="(11) 99999-0000">
       </div>
-      <div class="field">
-        <label class="field__label" for="f-email">E-mail</label>
-        <input id="f-email" name="email" type="email" value="${escapeHtml(employee.email || conta?.email || "")}"
-               placeholder="nome@editorainspire.com.br" ${conta || employee.id ? "disabled" : ""}>
-        <span class="field__hint">É o elo com a conta de acesso — muda em Contas de acesso.</span>
-      </div>
+      ${(() => {
+        const vinculada = conta || contaDaFicha(employee.id);
+        return `
+        <div class="field">
+          <label class="field__label" for="f-email">E-mail</label>
+          <input id="f-email" name="email" type="email"
+                 value="${escapeHtml(employee.email || vinculada?.email || "")}"
+                 placeholder="nome@editorainspire.com.br" ${vinculada ? "disabled" : ""}>
+          <span class="field__hint">${vinculada
+            ? "Vem da conta vinculada. Para mudar, edite a conta em Contas de acesso."
+            : "Sem conta vinculada, o e-mail é livre."}</span>
+        </div>`;
+      })()}
       <div class="field">
         <label class="field__label" for="f-admissao">Data de admissão</label>
         <input id="f-admissao" name="dataAdmissao" type="date" value="${toInputDate(employee.dataAdmissao)}">
@@ -5742,7 +5825,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
       <div class="field span-2">
         <label class="field__label" for="l-url">Endereço</label>
         <input id="l-url" name="url" value="${value("url")}" placeholder="drive.google.com/…" required>
-        <span class="field__hint">Pode colar sem o https:// — o sistema completa.</span>
+        <span class="field__hint">Fica salvo exatamente como você digitar. O https:// é acrescentado só ao abrir o link.</span>
       </div>
 
       <div class="field span-2">
@@ -6087,10 +6170,10 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
       <div class="field span-2">
         <label class="field__label" for="u-email">E-mail</label>
         <input id="u-email" name="email" type="email" value="${escapeHtml(conta.email || "")}"
-               placeholder="nome@editorainspire.com.br" ${editando ? "disabled" : "required"}>
+               placeholder="nome@editorainspire.com.br" required>
         <span class="field__hint">${editando
-          ? "O e-mail de uma conta existente só muda pelo painel do Supabase."
-          : "É por aqui que a pessoa entra e recebe o link de recuperação."}</span>
+          ? "Trocar aqui muda o login da pessoa e o e-mail da ficha na equipe."
+          : "É por aqui que a pessoa entra e recebe o código de recuperação."}</span>
       </div>
 
       ${editando ? "" : `
@@ -7242,8 +7325,24 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
         });
 
         container.querySelectorAll("[data-pick-account]").forEach((botao) => {
-          botao.addEventListener("click", () => {
+          botao.addEventListener("click", async () => {
             const conta = contas.find((c) => String(c.id) === botao.dataset.pickAccount);
+            const fichaId = botao.dataset.pickLink;
+
+            // Ficha já existente: vincula e abre para completar os dados.
+            if (fichaId) {
+              Modal.close();
+              try {
+                await linkEmployee(fichaId, conta.id);
+                Toast.success("Conta vinculada à ficha existente.");
+                await sync(true);
+                setTimeout(() => openEmployeeForm(findEmployee(fichaId)), 200);
+              } catch (error) {
+                Toast.error(friendlyMessage(error));
+              }
+              return;
+            }
+
             Modal.close();
             setTimeout(() => openEmployeeForm({}, conta), 280);
           });
@@ -7282,6 +7381,13 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
           button.innerHTML = '<span class="spinner"></span> Salvando…';
           try {
             if (editing) {
+              // Vínculo primeiro: é ele que define o e-mail da ficha.
+              const atual = contaDaFicha(employee.id);
+              const escolhida = data.perfil_id || "";
+              if (String(atual?.id || "") !== String(escolhida)) {
+                await linkEmployee(employee.id, escolhida);
+              }
+
               const before = findEmployee(employee.id);
               if (before && before.status !== data.status) {
                 data.historico = [...(before.historico || []), {
@@ -7674,8 +7780,17 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
         container.querySelector("#saveLink").addEventListener("click", async (event) => {
           const data = Modal.formData();
           if (!data.titulo || !data.url) { Toast.warning("Preencha título e endereço."); return; }
-          data.url = normalizeUrl(data.url);
           data.ordem = Number(data.ordem) || 0;
+          if (!pareceEndereco(data.url)) {
+            const segue = await Modal.confirm({
+              title: "Endereço estranho",
+              text: `"<strong>${escapeHtml(data.url)}</strong>" não parece um endereço de site.
+                     O atalho vai ser salvo assim mesmo?`,
+              confirmLabel: "Salvar assim",
+              danger: false
+            });
+            if (!segue) { openLinkForm(link); return; }
+          }
 
           const button = event.currentTarget;
           button.disabled = true;
@@ -8007,17 +8122,24 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
           } else {
             data.ativo = container.querySelector('[name="ativo"]').checked;
             if (souEu) { data.papel = "admin"; data.ativo = true; }
+            if (!data.email) { Toast.warning("Informe o e-mail."); return; }
           }
 
           const button = event.currentTarget;
           button.disabled = true;
           button.innerHTML = '<span class="spinner"></span> Salvando…';
           try {
-            if (editing) await updateUser(data);
-            else await createUser(data);
+            if (editing) {
+              const trocouEmail = String(data.email || "").toLowerCase() !== String(conta.email || "").toLowerCase();
+              if (trocouEmail) await changeUserEmail(conta.id, data.email);
+              await updateUser(data);
+            } else {
+              await createUser(data);
+            }
             Modal.close();
             Toast.success(editing ? "Conta atualizada." : "Conta criada. Passe a senha para a pessoa.");
             await carregarUsuarios(true, true);
+            await sync(true);
           } catch (error) {
             Toast.error(friendlyMessage(error));
             button.disabled = false;
