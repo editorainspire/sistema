@@ -5534,19 +5534,16 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
       </div>
       ${(() => {
         const vinculada = conta || contaDaFicha(employee.id);
-        // Com conta vinculada, mudar o e-mail aqui muda o login junto — por
-        // isso só o administrador pode. Sem vínculo, é um campo comum.
-        const travado = Boolean(vinculada) && !state.isAdmin;
+        // O e-mail é o login da pessoa. Editar num lugar só — Contas de acesso —
+        // evita duas telas mudando a mesma coisa e discordando.
         return `
         <div class="field">
           <label class="field__label" for="f-email">E-mail</label>
           <input id="f-email" name="email" type="email"
                  value="${escapeHtml(employee.email || vinculada?.email || "")}"
-                 placeholder="nome@editorainspire.com.br" ${travado ? "disabled" : ""}>
+                 placeholder="nome@editorainspire.com.br" ${vinculada ? "disabled" : ""}>
           <span class="field__hint">${vinculada
-            ? (travado
-                ? "Vem da conta vinculada. Só o administrador pode alterar."
-                : "É também o login da pessoa: mudar aqui muda o acesso dela.")
+            ? "É o login da pessoa. Para alterar, use Contas de acesso."
             : "Sem conta vinculada, o e-mail é livre."}</span>
         </div>`;
       })()}
@@ -7480,15 +7477,6 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
               const escolhida = data.perfil_id || "";
               if (String(atual?.id || "") !== String(escolhida)) {
                 await linkEmployee(employee.id, escolhida);
-              }
-
-              // E-mail alterado numa ficha com conta: troca o login junto,
-              // senão os dois se separam e o vínculo perde o sentido.
-              const vinculada = contaDaFicha(employee.id);
-              const novoEmail = String(data.email || "").trim().toLowerCase();
-              if (state.isAdmin && vinculada && novoEmail &&
-                  novoEmail !== String(vinculada.email || "").toLowerCase()) {
-                await changeUserEmail(vinculada.id, novoEmail);
               }
 
               const before = findEmployee(employee.id);
