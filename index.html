@@ -2472,6 +2472,106 @@ html[data-theme="dark"] .badge--cake { color: var(--secondary); }
   .comment__del { opacity: 1; }
 }
 
+/* ---------- Abas ---------- */
+.tabs {
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  margin-bottom: var(--sp-5);
+  background: var(--surface-2);
+  border-radius: var(--r-full);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tabs::-webkit-scrollbar { display: none; }
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 16px;
+  border-radius: var(--r-full);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-soft);
+  white-space: nowrap;
+  flex: none;
+  transition: color var(--fast) var(--ease), background var(--fast) var(--ease);
+}
+.tab:hover { color: var(--primary); }
+.tab.is-active {
+  background: var(--card);
+  color: var(--primary);
+  font-weight: 600;
+  box-shadow: var(--shadow-xs);
+}
+.tab svg { width: 15px; height: 15px; stroke-width: 1.9; }
+.tab__count {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: var(--r-full);
+  background: var(--card);
+  color: var(--text-mute);
+  font-variant-numeric: tabular-nums;
+}
+.tab.is-active .tab__count { background: var(--primary-soft); color: var(--primary); }
+
+/* ---------- Cartão de série recorrente ---------- */
+.serie {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-xs);
+  margin-bottom: var(--sp-4);
+  overflow: hidden;
+}
+.serie:last-child { margin-bottom: 0; }
+
+.serie__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-5);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.serie__icon {
+  width: 36px; height: 36px;
+  border-radius: var(--r-md);
+  display: grid; place-items: center;
+  background: var(--info-soft);
+  color: var(--info);
+  flex: none;
+}
+.serie__body { flex: 1; min-width: 0; }
+.serie__title { font-size: 14.5px; font-weight: 600; color: var(--primary); letter-spacing: -.02em; }
+.serie__meta {
+  display: flex; flex-wrap: wrap; gap: 6px 12px;
+  font-size: 11.5px; color: var(--text-mute); margin-top: 3px;
+}
+.serie__meta span { display: inline-flex; align-items: center; gap: 4px; }
+.serie__actions { display: flex; gap: 4px; flex: none; }
+.serie__actions button {
+  padding: 6px; border-radius: var(--r-sm);
+  color: var(--text-mute); transition: all var(--fast) var(--ease);
+}
+.serie__actions button svg { width: 15px; height: 15px; stroke-width: 1.9; }
+.serie__actions button:hover { background: var(--card); color: var(--primary); }
+.serie__actions button.danger:hover { background: var(--danger-soft); color: var(--danger); }
+
+.serie__list { padding: var(--sp-4) var(--sp-5); display: flex; flex-direction: column; gap: var(--sp-3); }
+
+.serie__more {
+  padding: 10px var(--sp-5) var(--sp-4);
+  font-size: 12px;
+  color: var(--text-mute);
+  text-align: center;
+}
+.serie__more button { font-weight: 600; color: var(--info); }
+.serie__more button:hover { text-decoration: underline; }
+
 /* ---------- Blocos da agenda ---------- */
 .agenda__block { margin-bottom: var(--sp-6); }
 .agenda__block:last-child { margin-bottom: 0; }
@@ -6258,89 +6358,172 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     grid.innerHTML = list.map((link, index) => linkCard(link, index, admin)).join("");
   }
 
-  /**
-   * Divide a agenda em blocos por proximidade. Antes era só "próximas" e
-   * "já aconteceram", e a semana toda virava uma parede única de reuniões.
-   */
-  function blocosDaAgenda(meetings) {
+  /** Reparte a agenda nas quatro abas. */
+  function abasDaAgenda(meetings) {
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
 
-    const amanha = new Date(hoje);
-    amanha.setDate(amanha.getDate() + 1);
-
-    // Fim da semana corrente: domingo. Segunda-feira devolve os 6 dias seguintes.
-    const fimDaSemana = new Date(hoje);
-    const diasAteDomingo = (7 - hoje.getDay()) % 7;
-    fimDaSemana.setDate(fimDaSemana.getDate() + diasAteDomingo);
-
-    const baldes = {
-      hoje: [], amanha: [], semana: [], adiante: [], passado: []
-    };
+    const passadas = [];
+    const doDia = [];
+    const futuras = [];
 
     meetings.forEach((meeting) => {
       const dia = parseDate(meeting.data);
       if (!dia) return;
       dia.setHours(0, 0, 0, 0);
 
-      if (dia < hoje) baldes.passado.push(meeting);
-      else if (dia.getTime() === hoje.getTime()) baldes.hoje.push(meeting);
-      else if (dia.getTime() === amanha.getTime()) baldes.amanha.push(meeting);
-      else if (dia <= fimDaSemana) baldes.semana.push(meeting);
-      else baldes.adiante.push(meeting);
+      if (dia < hoje) passadas.push(meeting);
+      else if (dia.getTime() === hoje.getTime()) doDia.push(meeting);
+      else futuras.push(meeting);
     });
 
-    return [
-      { chave: "hoje",    titulo: "Hoje",            cor: "var(--success)",   soft: "var(--success-soft)",   itens: baldes.hoje },
-      { chave: "amanha",  titulo: "Amanhã",          cor: "var(--info)",      soft: "var(--info-soft)",      itens: baldes.amanha },
-      { chave: "semana",  titulo: "Ainda esta semana", cor: "var(--secondary)", soft: "var(--secondary-soft)", itens: baldes.semana },
-      { chave: "adiante", titulo: "Mais adiante",    cor: "var(--purple)",    soft: "var(--purple-soft)",    itens: baldes.adiante },
-      { chave: "passado", titulo: "Já aconteceram",  cor: "var(--text-mute)", soft: "var(--gray)",           itens: baldes.passado, passado: true }
-    ].filter((bloco) => bloco.itens.length);
+    // Séries: uma entrada por serie_id, com as ocorrências em ordem de data.
+    const series = new Map();
+    meetings.forEach((meeting) => {
+      if (!meeting.serie_id) return;
+      const lista = series.get(meeting.serie_id) ?? [];
+      lista.push(meeting);
+      series.set(meeting.serie_id, lista);
+    });
+    for (const lista of series.values()) {
+      lista.sort((a, b) => String(a.data).localeCompare(String(b.data)));
+    }
+
+    return { passadas, hoje: doDia, futuras, series };
+  }
+
+  function diasEmCartoes(lista, employees, admin, doFimParaOComeco = false) {
+    const dias = groupMeetingsByDay(lista);
+    if (doFimParaOComeco) dias.reverse();
+
+    return dias.map(([isoDia, itens]) => `
+    <div class="agenda__day ${doFimParaOComeco ? "is-past" : ""}">
+      <div class="agenda__date">
+        <span class="agenda__label">${escapeHtml(agendaDayLabel(isoDia))}</span>
+        <span class="agenda__count">${itens.length} reuni${itens.length === 1 ? "ão" : "ões"}</span>
+      </div>
+      <div class="agenda__items">
+        ${itens.map((meeting) => meetingRow(meeting, employees, admin)).join("")}
+      </div>
+    </div>`).join("");
+  }
+
+  /** Um cartão por série, com as ocorrências que ainda vêm pela frente. */
+  function serieCard(serieId, ocorrencias, employees, admin) {
+    const primeira = ocorrencias[0];
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+
+    const futuras = ocorrencias.filter((m) => {
+      const dia = parseDate(m.data);
+      if (!dia) return false;
+      dia.setHours(0, 0, 0, 0);
+      return dia >= hoje;
+    });
+
+    const aberto = state.seriesAbertas.has(serieId);
+    const mostrar = aberto ? ocorrencias : futuras.slice(0, 3);
+    const escondidas = ocorrencias.length - mostrar.length;
+
+    const cadencia = RECURRENCE_LABEL[primeira.recorrencia] || "recorrente";
+    const proxima = futuras[0];
+
+    return `
+    <article class="serie" data-serie="${escapeHtml(serieId)}">
+      <div class="serie__head">
+        <span class="serie__icon">${icon("repeat", 17)}</span>
+        <div class="serie__body">
+          <div class="serie__title">${escapeHtml(primeira.titulo)}</div>
+          <div class="serie__meta">
+            <span>${icon("repeat", 12)} Repetição ${escapeHtml(cadencia)}</span>
+            <span>${icon("calendar", 12)} ${ocorrencias.length} encontros</span>
+            <span>${escapeHtml(formatDateShort(primeira.data))} → ${escapeHtml(formatDateShort(ocorrencias[ocorrencias.length - 1].data))}</span>
+            ${proxima
+              ? `<span style="color:var(--info);font-weight:600">Próxima: ${escapeHtml(agendaDayLabel(proxima.data))}, ${escapeHtml(cleanTime(proxima.inicio))}</span>`
+              : '<span>Série encerrada</span>'}
+          </div>
+        </div>
+        ${admin ? `
+        <div class="serie__actions">
+          <button data-action="edit-meeting" data-id="${escapeHtml((proxima || primeira).id)}" title="Editar a próxima ocorrência">${icon("edit", 15)}</button>
+          <button class="danger" data-action="delete-serie" data-id="${escapeHtml(serieId)}" title="Excluir a série inteira">${icon("trash", 15)}</button>
+        </div>` : ""}
+      </div>
+
+      <div class="serie__list">
+        ${mostrar.length
+          ? mostrar.map((meeting) => meetingRow(meeting, employees, admin)).join("")
+          : '<p class="muted" style="font-size:13px">Nenhum encontro pela frente nesta série.</p>'}
+      </div>
+
+      ${escondidas > 0 || aberto ? `
+      <div class="serie__more">
+        <button data-action="toggle-serie" data-id="${escapeHtml(serieId)}">
+          ${aberto ? "Mostrar menos" : `Ver os outros ${escondidas} encontros`}
+        </button>
+      </div>` : ""}
+    </article>`;
   }
 
   function renderAgenda(meetings, employees, admin) {
     const container = document.getElementById("agenda");
     if (!container) return;
 
-    const blocos = blocosDaAgenda(meetings);
+    const { passadas, hoje: doDia, futuras, series } = abasDaAgenda(meetings);
 
-    if (!blocos.length) {
-      container.innerHTML = emptyState({
-        title: "Nenhuma reunião agendada",
-        text: "Marque a primeira e o painel avisa quem já tem compromisso no horário.",
-        iconName: "calendar",
-        action: admin ? '<button class="btn btn--primary" data-action="new-meeting">Agendar reunião</button>' : ""
-      });
-      return;
+    const abas = [
+      { chave: "hoje",        rotulo: "Hoje",            icone: "clock",    total: doDia.length },
+      { chave: "futuras",     rotulo: "Próximas",        icone: "calendar", total: futuras.length },
+      { chave: "recorrentes", rotulo: "Recorrentes",     icone: "repeat",   total: series.size },
+      { chave: "passadas",    rotulo: "Já aconteceram",  icone: "book",     total: passadas.length }
+    ];
+
+    // Na primeira pintura, abre onde há o que ver.
+    if (!state.agendaTab) {
+      state.agendaTab = doDia.length ? "hoje" : futuras.length ? "futuras" : "passadas";
+    }
+    const ativa = state.agendaTab;
+
+    const barra = `
+    <div class="tabs" role="tablist">
+      ${abas.map((aba) => `
+      <button class="tab ${aba.chave === ativa ? "is-active" : ""}" role="tab"
+              aria-selected="${aba.chave === ativa}" data-agenda-tab="${aba.chave}">
+        ${icon(aba.icone, 15)} ${escapeHtml(aba.rotulo)}
+        <span class="tab__count">${aba.total}</span>
+      </button>`).join("")}
+    </div>`;
+
+    const vazio = (titulo, texto) => emptyState({
+      title: titulo,
+      text: texto,
+      iconName: "calendar",
+      action: admin ? '<button class="btn btn--primary" data-action="new-meeting">Agendar reunião</button>' : ""
+    });
+
+    let painel = "";
+    if (ativa === "hoje") {
+      painel = doDia.length
+        ? diasEmCartoes(doDia, employees, admin)
+        : vazio("Nenhuma reunião hoje", "Dia livre. As próximas estão na aba ao lado.");
+    } else if (ativa === "futuras") {
+      painel = futuras.length
+        ? diasEmCartoes(futuras, employees, admin)
+        : vazio("Nada agendado pela frente", "Marque a próxima e o painel avisa quem já tem compromisso no horário.");
+    } else if (ativa === "recorrentes") {
+      painel = series.size
+        ? [...series.entries()]
+            .sort((a, b) => String(a[1][0].data).localeCompare(String(b[1][0].data)))
+            .map(([serieId, ocorrencias]) => serieCard(serieId, ocorrencias, employees, admin)).join("")
+        : vazio("Nenhuma reunião recorrente",
+                "Ao agendar, escolha uma repetição para criar uma série — semanal, quinzenal ou mensal.");
+    } else {
+      painel = passadas.length
+        ? diasEmCartoes(passadas, employees, admin, true)
+        : vazio("Nenhuma reunião no histórico", "O que já aconteceu aparece aqui, do mais recente para o mais antigo.");
     }
 
-    const diasDoBloco = (bloco) => {
-      const dias = groupMeetingsByDay(bloco.itens);
-      // No passado, o mais recente primeiro; no futuro, o mais próximo primeiro.
-      if (bloco.passado) dias.reverse();
-
-      return dias.map(([isoDia, itens]) => `
-      <div class="agenda__day ${bloco.passado ? "is-past" : ""}">
-        <div class="agenda__date">
-          <span class="agenda__label">${escapeHtml(agendaDayLabel(isoDia))}</span>
-          <span class="agenda__count">${itens.length} reuni${itens.length === 1 ? "ão" : "ões"}</span>
-        </div>
-        <div class="agenda__items">
-          ${itens.map((meeting) => meetingRow(meeting, employees, admin)).join("")}
-        </div>
-      </div>`).join("");
-    };
-
-    container.innerHTML = blocos.map((bloco) => `
-    <section class="agenda__block">
-      <div class="agenda__block-head" style="--block-color:${bloco.cor};--block-soft:${bloco.soft}">
-        <span class="agenda__block-title">${escapeHtml(bloco.titulo)}</span>
-        <span class="agenda__block-tag">${bloco.itens.length}</span>
-        <span class="agenda__block-line"></span>
-      </div>
-      ${diasDoBloco(bloco)}
-    </section>`).join("");
+    container.innerHTML = barra + painel;
   }
 
   function renderMeetingStrip(meetings) {
@@ -6394,7 +6577,9 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     tokenRecuperacao: null,
     emailRecuperacao: "",
     dadosIniciais: null,
-    usuariosEm: 0
+    usuariosEm: 0,
+    agendaTab: "",
+    seriesAbertas: new Set()
   };
 
   const PAPEL_LABEL = { admin: "Administrador", editor: "Editor", leitor: "Leitor" };
@@ -7597,6 +7782,28 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     }
   }
 
+  async function removeSerieInteira(serieId) {
+    const ocorrencias = state.meetings.filter((m) => m.serie_id === serieId);
+    if (!ocorrencias.length) return;
+
+    const ok = await Modal.confirm({
+      title: "Excluir a série inteira",
+      text: `Os <strong>${ocorrencias.length}</strong> encontros de
+             "<strong>${escapeHtml(ocorrencias[0].titulo)}</strong>" saem da agenda,
+             inclusive os que já aconteceram e suas atas.`
+    });
+    if (!ok) return;
+
+    try {
+      await deleteMeetingSeries(serieId);
+      state.seriesAbertas.delete(serieId);
+      Toast.success(`${ocorrencias.length} encontros excluídos.`);
+      await sync(true);
+    } catch (error) {
+      Toast.error(friendlyMessage(error));
+    }
+  }
+
   /** Reunião de série: separa "só esta" de "esta e as próximas". */
   function openSeriesDelete(meeting) {
     const naSerie = state.meetings.filter((m) => m.serie_id === meeting.serie_id);
@@ -8050,6 +8257,14 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
       render();
     });
 
+    // Abas da agenda: redesenha só a agenda, não a tela inteira.
+    document.getElementById("agenda").addEventListener("click", (event) => {
+      const aba = event.target.closest("[data-agenda-tab]");
+      if (!aba) return;
+      state.agendaTab = aba.dataset.agendaTab;
+      renderAgenda(state.meetings, state.employees, state.podeEditar);
+    });
+
     document.getElementById("linkChips").addEventListener("click", (event) => {
       const chip = event.target.closest("[data-cat]");
       if (!chip) return;
@@ -8125,6 +8340,13 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
         case "categories": openCategories(); break;
 
         case "new-meeting": openMeetingForm(); break;
+        case "toggle-serie": {
+          if (state.seriesAbertas.has(id)) state.seriesAbertas.delete(id);
+          else state.seriesAbertas.add(id);
+          renderAgenda(state.meetings, state.employees, state.podeEditar);
+          break;
+        }
+        case "delete-serie": await removeSerieInteira(id); break;
         case "edit-meeting": openMeetingForm(state.meetings.find((item) => String(item.id) === String(id))); break;
         case "delete-meeting": await removeMeeting(id); break;
 
