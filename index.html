@@ -2607,32 +2607,7 @@ html[data-theme="dark"] .badge--cake { color: var(--secondary); }
 .notif__text { font-size: 12px; color: var(--text-soft); line-height: 1.5; margin-top: 2px; }
 .notif__when { font-size: 11px; color: var(--text-mute); margin-top: 3px; }
 
-/* ---------- Escolha da conta ao criar uma ficha ---------- */
-.pick-list { display: flex; flex-direction: column; gap: 8px; }
-
-.pick-account {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  width: 100%;
-  padding: 11px var(--sp-3);
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  background: var(--card);
-  text-align: left;
-  transition: all var(--fast) var(--ease);
-}
-.pick-account:hover {
-  border-color: var(--primary);
-  background: var(--primary-soft);
-  transform: translateX(2px);
-}
-.pick-account__body { flex: 1; min-width: 0; }
-.pick-account__name { font-size: 13.5px; font-weight: 500; color: var(--primary); }
-.pick-account__mail { font-size: 11.5px; color: var(--text-mute); word-break: break-all; }
-.pick-account__go { color: var(--text-mute); flex: none; }
-.pick-account:hover .pick-account__go { color: var(--primary); }
-
+/* ---------- Conta vinculada à ficha ---------- */
 .linked-field {
   display: flex;
   align-items: center;
@@ -2644,10 +2619,14 @@ html[data-theme="dark"] .badge--cake { color: var(--secondary); }
 }
 .linked-field__body { flex: 1; min-width: 0; }
 .linked-field__label {
+  display: block;
   font-size: 10px; font-weight: 600; letter-spacing: .1em;
   text-transform: uppercase; color: var(--text-mute);
 }
-.linked-field__value { font-size: 13px; font-weight: 500; color: var(--primary); word-break: break-all; }
+.linked-field__value {
+  display: block;
+  font-size: 13px; font-weight: 500; color: var(--primary); word-break: break-all;
+}
 .linked-field svg { color: var(--text-mute); flex: none; }
 
 /* ---------- Abas ---------- */
@@ -3325,10 +3304,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
                 Importar Excel
               </button>
               <button class="btn btn--ghost" data-action="export-csv">Exportar CSV</button>
-              <button class="btn btn--primary" data-action="new-employee" data-edit-only>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-                Novo colaborador
-              </button>
+
             </div>
           </div>
 
@@ -3434,13 +3410,6 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
           </div>
 
           <div class="admin-grid">
-            <button class="admin-card" data-action="new-employee">
-              <span class="admin-card__icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 12-4.9"/><path d="M17 14v6M14 17h6"/></svg>
-              </span>
-              <span class="admin-card__title">Cadastrar colaborador</span><span class="admin-card__text">Nome, cargo, contato, foto e situação atual.</span>
-            </button>
-
             <button class="admin-card" data-action="new-notice">
               <span class="admin-card__icon">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M3 11v2a1 1 0 0 0 1 1h2l3.5 4.5a1 1 0 0 0 1.8-.6V6.1a1 1 0 0 0-1.8-.6L6 10H4a1 1 0 0 0-1 1z"/><path d="M15 8a4 4 0 0 1 0 8"/></svg>
@@ -3504,7 +3473,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
                 <h3>Colaboradores</h3>
                 <p class="muted" style="font-size:12.5px">Alterar status, editar cadastro, definir substituto ou excluir.</p>
               </div>
-              <button class="btn btn--primary btn--sm" data-action="new-employee">Novo colaborador</button>
+
             </div>
             <div class="table-scroll">
               <table>
@@ -5464,60 +5433,6 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     return state.audiencia.find((c) => String(c.colaborador_id) === String(colaboradorId)) || null;
   }
 
-  /** Ficha cuja pessoa tem o mesmo e-mail — usado para sugerir vínculo. */
-  function fichaPorEmail(email) {
-    const alvo = String(email || "").trim().toLowerCase();
-    if (!alvo) return null;
-    return state.employees.find((e) => String(e.email || "").trim().toLowerCase() === alvo) || null;
-  }
-
-  function contasSemFicha() {
-    // colaborador_id volta a ser nulo sozinho quando a ficha é excluída,
-    // então basta olhar para ele.
-    return state.audiencia.filter((conta) => !conta.colaborador_id);
-  }
-
-  function accountPickBody(contas) {
-    if (!contas.length) {
-      return `
-      <div class="empty" style="border:0;padding:var(--sp-6) var(--sp-4)">
-        <div class="empty__icon">${icon("lock", 24)}</div>
-        <h3>Nenhuma conta disponível</h3>
-        <p>Todas as contas ativas já têm ficha na equipe. Para cadastrar alguém novo,
-           crie primeiro a conta de acesso — ou aprove um cadastro que esteja esperando.</p>
-        ${state.isAdmin
-          ? '<button class="btn btn--primary" id="pickGoUsers">Ir para Contas de acesso</button>'
-          : '<p class="muted" style="font-size:12.5px">Peça a um administrador para criar a conta.</p>'}
-      </div>`;
-    }
-
-    return `
-    <p class="muted" style="font-size:13px;margin-bottom:16px">
-      A ficha da equipe nasce de uma conta de acesso. Escolha de quem é esta:
-    </p>
-    <div class="pick-list">
-      ${contas.map((conta) => {
-        // Já existe ficha com esse e-mail? Então é vínculo, não cadastro novo —
-        // criar outra duplicaria a pessoa com foto e histórico em branco.
-        const ficha = fichaPorEmail(conta.email);
-        return `
-        <button class="pick-account" data-pick-account="${escapeHtml(conta.id)}"
-                ${ficha ? `data-pick-link="${escapeHtml(ficha.id)}"` : ""}>
-          <div class="avatar avatar--xs" style="--status-color:${ficha ? "var(--secondary)" : "var(--primary)"}">${initials(conta.nome || conta.email)}</div>
-          <div class="pick-account__body">
-            <div class="pick-account__name">${escapeHtml(conta.nome || "Sem nome")}</div>
-            <div class="pick-account__mail">${escapeHtml(conta.email)}</div>
-            ${ficha
-              ? `<div class="pick-account__mail" style="color:var(--secondary);font-weight:600;margin-top:2px">
-                   Já existe a ficha de ${escapeHtml(ficha.nome)} — vincular a ela
-                 </div>`
-              : ""}
-          </div>
-          <span class="pick-account__go">${icon(ficha ? "link" : "external", 15)}</span>
-        </button>`;
-      }).join("")}
-    </div>`;
-  }
 
   function employeeFormBody(employee = {}, people = [], conta = null) {
     const value = (key) => escapeHtml(employee[key] || "");
@@ -7401,10 +7316,10 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
         title: state.employees.length ? "Nenhum colaborador encontrado" : "Nenhum colaborador cadastrado",
         text: state.employees.length
           ? "Ajuste a busca ou limpe os filtros para ver a equipe completa."
-          : "Cadastre a equipe para o painel começar a mostrar quem está disponível.",
+          : "A equipe se forma pelas contas de acesso: quem é aprovado entra aqui automaticamente.",
         action: state.employees.length
           ? '<button class="btn btn--ghost" id="emptyClear">Limpar filtros</button>'
-          : (admin ? '<button class="btn btn--primary" data-action="new-employee">Cadastrar colaborador</button>' : "")
+          : (state.isAdmin ? '<button class="btn btn--primary" data-action="users">Ir para Contas de acesso</button>' : "")
       });
     } else {
       grid.innerHTML = filtered.map((employee, index) => employeeCard(employee, index, admin)).join("");
@@ -7516,52 +7431,18 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     });
   }
 
-  /** Passo 1 de um cadastro novo: de qual conta é esta ficha? */
-  function openAccountPicker() {
-    const contas = contasSemFicha();
-    Modal.open({
-      title: "Novo colaborador",
-      subtitle: "Escolha a conta de acesso",
-      size: "sm",
-      body: accountPickBody(contas),
-      footer: `<button class="btn btn--ghost btn--block" data-close>Cancelar</button>`,
-      onMount: (container) => {
-        container.querySelector("#pickGoUsers")?.addEventListener("click", () => {
-          Modal.close();
-          switchView("usuarios");
-        });
 
-        container.querySelectorAll("[data-pick-account]").forEach((botao) => {
-          botao.addEventListener("click", async () => {
-            const conta = contas.find((c) => String(c.id) === botao.dataset.pickAccount);
-            const fichaId = botao.dataset.pickLink;
-
-            // Ficha já existente: vincula e abre para completar os dados.
-            if (fichaId) {
-              Modal.close();
-              try {
-                await linkEmployee(fichaId, conta.id);
-                Toast.success("Conta vinculada à ficha existente.");
-                await sync(true);
-                setTimeout(() => openEmployeeForm(findEmployee(fichaId)), 200);
-              } catch (error) {
-                Toast.error(friendlyMessage(error));
-              }
-              return;
-            }
-
-            Modal.close();
-            setTimeout(() => openEmployeeForm({}, conta), 280);
-          });
-        });
-      }
-    });
-  }
-
+  /**
+   * Só edita. Fichas nascem da aprovação de uma conta de acesso — não existe
+   * mais cadastro avulso, para ninguém entrar na equipe sem poder fazer login.
+   */
   function openEmployeeForm(employee = {}, conta = null) {
     const editing = Boolean(employee.id);
-    // Ficha nova sem conta escolhida: volta um passo.
-    if (!editing && !conta) { openAccountPicker(); return; }
+    if (!editing && !conta) {
+      Toast.info("Colaboradores entram pela aprovação da conta de acesso.");
+      if (state.isAdmin) switchView("usuarios");
+      return;
+    }
     Modal.open({
       title: editing ? "Editar colaborador" : "Novo colaborador",
       subtitle: editing ? employee.nome : `Ficha de ${conta?.nome || conta?.email || "novo colaborador"}`,
@@ -9057,7 +8938,6 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
         case "edit": openEmployeeForm(findEmployee(id)); break;
         case "status": openStatusForm(findEmployee(id)); break;
         case "delete": await removeEmployee(id); break;
-        case "new-employee": openEmployeeForm(); break;
 
         case "new-notice": openNoticeForm(); break;
         case "open-notice": abrirComunicado(id); break;
