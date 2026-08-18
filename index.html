@@ -2697,7 +2697,9 @@ html[data-theme="dark"] .badge--cake { color: var(--secondary); }
 .org-card {
   position: relative;
   width: 196px;
-  min-height: 78px;
+  /* Altura fixa: com a faixa do líder o conteúdo varia, e caixas de tamanhos
+     diferentes desalinhariam as fileiras. */
+  height: 118px;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -2730,18 +2732,61 @@ html[data-theme="dark"] .badge--cake { color: var(--secondary); }
   word-break: break-word;
 }
 .org-card__meta { font-size: 11px; color: var(--text-mute); }
-.org-card__grip {
+.org-card__acoes {
   position: absolute;
-  top: 8px; right: 8px;
-  color: var(--text-mute);
+  top: 6px; right: 6px;
+  display: flex;
+  gap: 2px;
   opacity: 0;
   transition: opacity var(--fast) var(--ease);
 }
-.org-card__grip svg { width: 14px; height: 14px; }
-.org-card:hover .org-card__grip { opacity: 1; }
+.org-card__acoes button {
+  padding: 3px;
+  border-radius: var(--r-sm);
+  color: var(--text-mute);
+  transition: all var(--fast) var(--ease);
+}
+.org-card__acoes button svg { width: 14px; height: 14px; }
+.org-card__acoes button:hover { background: var(--surface-2); color: var(--primary); }
+.org-card:hover .org-card__acoes { opacity: 1; }
+
+/* Faixa do líder: mesmo destaque da caixa de primeiro nível. */
+.org-lider {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: auto;
+  padding: 6px 8px;
+  border-radius: var(--r-sm);
+  background: var(--org-color, var(--primary));
+  color: #fff;
+  min-height: 34px;
+}
+.org-lider__corpo { min-width: 0; line-height: 1.2; }
+.org-lider__nome {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.org-lider__cargo {
+  display: block;
+  font-size: 10px;
+  opacity: .8;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.org-lider svg { width: 13px; height: 13px; flex: none; opacity: .9; }
+.org-lider--vazio {
+  background: var(--surface-2);
+  color: var(--text-mute);
+  font-size: 11px;
+  justify-content: center;
+}
 
 .org-card--root {
   width: 232px;
+  height: auto;
+  min-height: 118px;
   border-left-width: 1px;
   border-color: var(--primary);
   background: var(--primary);
@@ -2788,7 +2833,8 @@ body.can-edit .org-card--movel:hover { transform: translateY(-2px); box-shadow: 
 }
 .org-person:hover { background: var(--gray); }
 .org-person__dot { width: 6px; height: 6px; border-radius: 50%; background: var(--status-color, var(--text-mute)); flex: none; }
-.org-person__name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.org-person__nome { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.org-person__cargo { color: var(--text-mute); }
 .org-people__more { font-size: 10.5px; color: var(--text-mute); text-align: center; padding-top: 2px; }
 
 .org-hint {
@@ -4716,6 +4762,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
   const removeComment = (id) => call("announcements.commentDelete", { id });
   const loadNotifications = async () => ({ items: (await call("notifications.list")) || [] });
   const moveOrgNode = (nome, pai) => call("org.move", { nome, pai });
+  const setOrgLeader = (nome, lider) => call("org.leader", { nome, lider: lider || "" });
   const markNotificationsSeen = (ids = null) => call("notifications.seen", ids ? { ids } : {});
   const loadAudience = async () => ({ items: (await call("announcements.audience")) || [] });
   const updateAnnouncement = (data) => call("announcements.update", data);
@@ -4878,6 +4925,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     envelope: '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 8 10 6 10-6"/><circle cx="19" cy="6" r="3" fill="currentColor" stroke="none"/>',
     chat: '<path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9 9 0 0 1-3.9-.9L3 20.5l1.5-4.6A8.4 8.4 0 0 1 3.6 11.5 8.4 8.4 0 0 1 12 3.1a8.4 8.4 0 0 1 9 8.4z"/>',
     send: '<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/>',
+    crown: '<path d="M3 18h18"/><path d="M4 8l4 3 4-6 4 6 4-3-2 8H6z"/>',
     move: '<circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/>',
     bell: '<path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>',
     at: '<circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 5.4 1.8A10 10 0 1 0 17 20"/>'
@@ -7100,16 +7148,28 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
       filhos.get(pai).push(nome);
     });
 
-    const nó = (nome) => ({
-      nome,
-      pessoas: (areas.get(nome) || []).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")),
-      filhos: (filhos.get(nome) || []).map(nó)
-    });
+    const liderDe = new Map(
+      (hierarquia || []).filter((l) => l.lider).map((l) => [String(l.nome), String(l.lider)])
+    );
+    const acharFicha = (id) => employees.find((e) => String(e.id) === String(id)) || null;
+
+    const nó = (nome) => {
+      const todos = (areas.get(nome) || []).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+      const lider = acharFicha(liderDe.get(nome));
+      return {
+        nome,
+        lider,
+        // O líder sobe para a faixa de destaque, então sai da lista de baixo.
+        pessoas: lider ? todos.filter((p) => String(p.id) !== String(lider.id)) : todos,
+        filhos: (filhos.get(nome) || []).map(nó)
+      };
+    };
 
     return {
       raizes: (filhos.get("") || []).map(nó),
       total: areas.size,
-      pessoasRaiz: daRaiz.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
+      pessoasRaiz: daRaiz.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")),
+      liderRaiz: acharFicha(liderDe.get(ORG_RAIZ))
     };
   }
 
@@ -7127,16 +7187,34 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
         return `
         <div class="org-person" title="${escapeHtml(pessoa.nome)}${pessoa.cargo ? " · " + escapeHtml(pessoa.cargo) : ""}">
           <span class="org-person__dot" style="--status-color:${meta.color}"></span>
-          <span class="org-person__name">${escapeHtml(pessoa.nome)}</span>
+          <span class="org-person__nome">${escapeHtml(pessoa.nome)}${
+            pessoa.cargo ? ` <span class="org-person__cargo">(${escapeHtml(pessoa.cargo)})</span>` : ""
+          }</span>
         </div>`;
       }).join("")}
       ${resto > 0 ? `<div class="org-people__more">+ ${resto} pessoa${resto === 1 ? "" : "s"}</div>` : ""}
     </div>`;
   }
 
+  function orgFaixaLider(lider, admin, area) {
+    if (!lider) {
+      return admin
+        ? `<button class="org-lider org-lider--vazio" data-org-lider="${escapeHtml(area)}">${icon("crown", 13)} Definir líder</button>`
+        : `<div class="org-lider org-lider--vazio">Sem líder definido</div>`;
+    }
+    return `
+    <div class="org-lider" title="${escapeHtml(lider.nome)}${lider.cargo ? " · " + escapeHtml(lider.cargo) : ""}">
+      ${icon("crown", 13)}
+      <span class="org-lider__corpo">
+        <span class="org-lider__nome">${escapeHtml(lider.nome)}</span>
+        ${lider.cargo ? `<span class="org-lider__cargo">${escapeHtml(lider.cargo)}</span>` : ""}
+      </span>
+    </div>`;
+  }
+
   function orgRamo(no, admin) {
     const total = (function contar(n) {
-      return n.pessoas.length + n.filhos.reduce((soma, f) => soma + contar(f), 0);
+      return n.pessoas.length + (n.lider ? 1 : 0) + n.filhos.reduce((soma, f) => soma + contar(f), 0);
     })(no);
 
     const { color } = areaColor(no.nome);
@@ -7146,10 +7224,16 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
       <div class="org-card org-card--movel" style="--org-color:${color}"
            data-org-node="${escapeHtml(no.nome)}"
            ${admin ? 'draggable="true"' : ""}>
-        ${admin ? `<span class="org-card__grip" data-org-menu="${escapeHtml(no.nome)}" title="Mover esta área">${icon("move", 14)}</span>` : ""}
+        ${admin ? `
+        <span class="org-card__acoes">
+          <button data-org-lider="${escapeHtml(no.nome)}" title="Definir líder da área">${icon("crown", 14)}</button>
+          <button data-org-menu="${escapeHtml(no.nome)}" title="Mover esta área">${icon("move", 14)}</button>
+        </span>` : ""}
         <span class="org-card__name">${escapeHtml(no.nome)}</span>
-        <span class="org-card__meta">${no.pessoas.length} direto${no.pessoas.length === 1 ? "" : "s"}${
+        <span class="org-card__meta">${no.pessoas.length + (no.lider ? 1 : 0)} pessoa${
+          no.pessoas.length + (no.lider ? 1 : 0) === 1 ? "" : "s"}${
           no.filhos.length ? ` · ${total} no total` : ""}</span>
+        ${orgFaixaLider(no.lider, admin, no.nome)}
       </div>
 
       ${orgPessoas(no.pessoas, no.nome)}
@@ -7165,7 +7249,7 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     const container = document.getElementById("orgChart");
     if (!container) return;
 
-    const { raizes, total, pessoasRaiz } = montarOrganograma(employees, hierarquia);
+    const { raizes, total, pessoasRaiz, liderRaiz } = montarOrganograma(employees, hierarquia);
     const contador = document.getElementById("navCountOrg");
     if (contador) contador.textContent = total;
 
@@ -7182,8 +7266,13 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     <div class="org__canvas">
       <div class="org-branch">
         <div class="org-card org-card--root" data-org-node="${escapeHtml(ORG_RAIZ)}">
+          ${admin ? `
+          <span class="org-card__acoes">
+            <button data-org-lider="${escapeHtml(ORG_RAIZ)}" title="Definir quem responde pela editora">${icon("crown", 14)}</button>
+          </span>` : ""}
           <span class="org-card__name">${escapeHtml(ORG_RAIZ)}</span>
           <span class="org-card__meta">${employees.length} pessoas · ${total} área${total === 1 ? "" : "s"}</span>
+          ${orgFaixaLider(liderRaiz, admin, ORG_RAIZ)}
         </div>
         ${pessoasRaiz.length ? orgPessoas(pessoasRaiz, ORG_RAIZ) : ""}
         <div class="org-branch__kids">
@@ -9054,6 +9143,65 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     }
   }
 
+  function openDefinirLider(area) {
+    const daArea = state.employees
+      .filter((p) => slugify(String(p.departamento || "").trim() || ORG_RAIZ) === slugify(area))
+      .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+
+    const outros = state.employees
+      .filter((p) => !daArea.some((d) => d.id === p.id))
+      .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+
+    const atual = (state.organograma.find((l) => l.nome === area) || {}).lider || "";
+    const opcao = (p) => `<option value="${escapeHtml(p.id)}" ${String(p.id) === String(atual) ? "selected" : ""}>
+      ${escapeHtml(p.nome)}${p.cargo ? ` — ${escapeHtml(p.cargo)}` : ""}</option>`;
+
+    Modal.open({
+      title: "Líder da área",
+      subtitle: area,
+      size: "sm",
+      body: `
+      <form class="form-grid" id="liderForm" novalidate>
+        <div class="field span-2">
+          <label class="field__label" for="org-lider">Quem responde por esta área</label>
+          <select id="org-lider" name="lider">
+            <option value="" ${atual ? "" : "selected"}>Sem líder definido</option>
+            ${daArea.length ? `<optgroup label="Desta área">${daArea.map(opcao).join("")}</optgroup>` : ""}
+            ${outros.length ? `<optgroup label="Outras áreas">${outros.map(opcao).join("")}</optgroup>` : ""}
+          </select>
+          <span class="field__hint">O nome sobe para o topo da caixa, em destaque, e sai da lista de baixo.</span>
+        </div>
+      </form>`,
+      footer: `
+      <button class="btn btn--ghost" data-close>Cancelar</button>
+      <span class="spacer"></span>
+      <button class="btn btn--primary" id="liderSalvar">${icon("check", 15)} Salvar</button>`,
+      onMount: (container) => {
+        container.querySelector("#liderSalvar").addEventListener("click", async (event) => {
+          const escolhido = container.querySelector("#org-lider").value;
+          const botao = event.currentTarget;
+          botao.disabled = true;
+          botao.innerHTML = '<span class="spinner"></span> Salvando…';
+          Modal.close();
+          try {
+            await setOrgLeader(area, escolhido);
+            state.organograma = [
+              ...state.organograma.filter((l) => l.nome !== area),
+              { ...(state.organograma.find((l) => l.nome === area) || { pai: "", ordem: 0 }),
+                nome: area, lider: escolhido || null }
+            ];
+            renderOrganograma(state.employees, state.organograma, state.podeEditar);
+            Toast.success(escolhido ? "Líder definido." : "Área ficou sem líder.");
+            await sync(true);
+          } catch (error) {
+            Toast.error(friendlyMessage(error));
+            await sync(true);
+          }
+        });
+      }
+    });
+  }
+
   /** Alternativa ao arrastar, que não funciona bem em telas de toque. */
   function openMoverArea(nome) {
     const { raizes } = montarOrganograma(state.employees, state.organograma);
@@ -9183,9 +9331,13 @@ html[data-theme="dark"] .brand__mark { background: var(--secondary); color: #0B1
     });
 
     container.addEventListener("click", (event) => {
+      if (!state.podeEditar) return;
+
+      const lider = event.target.closest("[data-org-lider]");
+      if (lider) { openDefinirLider(lider.dataset.orgLider); return; }
+
       const grip = event.target.closest("[data-org-menu]");
-      if (!grip || !state.podeEditar) return;
-      openMoverArea(grip.dataset.orgMenu);
+      if (grip) openMoverArea(grip.dataset.orgMenu);
     });
   }
 
